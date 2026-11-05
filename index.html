@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redator PPE</title>
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#ffffff; --bg2:#f7f6f3; --bg3:#efeeeb; --txt:#37352f; --mut:rgba(55,53,47,.62); --fai:rgba(55,53,47,.4);
+  --line:rgba(55,53,47,.12); --acc:#2383e2; --accbg:rgba(35,131,226,.08); --warnbg:#fbf3db; --warnbd:#f0dfa6; --ok:#0f7b6c;
+  --shadow:0 1px 2px rgba(15,15,15,.06),0 4px 14px rgba(15,15,15,.07);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#191919; --bg2:#202020; --bg3:#2b2b2b; --txt:rgba(255,255,255,.88); --mut:rgba(255,255,255,.55); --fai:rgba(255,255,255,.35);
+  --line:rgba(255,255,255,.13); --acc:#529cca; --accbg:rgba(82,156,202,.14); --warnbg:#3a3321; --warnbd:#574b27; --ok:#4dab9a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 14px rgba(0,0,0,.4);}
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji",sans-serif}
+.cover{height:130px;background:linear-gradient(120deg,#e9d8c4 0%,#d7e3ec 55%,#dfeadb 100%)}
+@media (prefers-color-scheme:dark){.cover{background:linear-gradient(120deg,#3b2f25 0%,#27343e 55%,#2a3a2c 100%)}}
+.page{max-width:1060px;margin:0 auto;padding:0 clamp(16px,4vw,48px) 140px}
+.icon{font-size:64px;line-height:1;margin-top:-34px;display:block}
+h1{font-size:clamp(30px,5vw,40px);line-height:1.15;margin:10px 0 4px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--mut);margin:0 0 22px;font-size:15px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--bg);color:var(--txt);border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer;transition:.12s}
+.chip:hover{background:var(--bg2)}
+.chip[aria-pressed=true]{background:var(--txt);color:var(--bg);border-color:var(--txt)}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--bg);color:var(--txt);border-radius:6px;padding:6px 12px;font:inherit;font-size:14px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.btn:hover{background:var(--bg2)}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.55;cursor:wait}
+.btn.sm{padding:2px 8px;font-size:12.5px;color:var(--mut)}
+.drop{margin:14px 0 6px;border:1px dashed var(--line);border-radius:8px;padding:10px 14px;color:var(--mut);font-size:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.drop.over{background:var(--accbg);border-color:var(--acc)}
+.props{margin:18px 0 6px;border-top:1px solid var(--line)}
+.prop{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line);min-height:40px}
+.prop>span{color:var(--mut);font-size:14px}
+.prop input,.prop select{font:inherit;color:inherit;background:transparent;border:0;border-radius:4px;padding:5px 6px;width:100%;max-width:340px}
+.prop input:hover,.prop select:hover{background:var(--bg2)}
+.prop input:focus,.prop select:focus{outline:2px solid var(--acc);background:var(--bg)}
+.prop .ro{padding:5px 6px}
+.callout{display:none;margin:16px 0 0;background:var(--warnbg);border:1px solid var(--warnbd);border-radius:6px;padding:12px 14px;font-size:14.5px}
+.callout.show{display:block}
+.callout b{display:block;margin-bottom:4px}
+.callout ul{margin:4px 0 0 18px;padding:0}
+.callout .x{float:right;cursor:pointer;color:var(--mut);background:none;border:0;font-size:16px}
+.field{margin-top:30px}
+.fhead{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;margin-bottom:8px}
+.fname{font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+.fname i{color:#e03e3e;font-style:normal}
+.fhint{color:var(--mut);font-size:13.5px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:820px){.cols{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:4px}
+.clabel{display:flex;align-items:center;gap:6px;color:var(--fai);font-size:12.5px;min-height:26px}
+.clabel .spacer{flex:1}
+textarea{width:100%;min-height:96px;resize:none;overflow:hidden;font:inherit;font-size:15.5px;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;line-height:1.55}
+textarea:hover{background:var(--bg2)}
+textarea:focus{outline:2px solid var(--acc);outline-offset:-1px;background:var(--bg)}
+textarea.out{background:var(--bg2)}
+textarea.out:focus{background:var(--bg)}
+textarea.wait{opacity:.5}
+.bar{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-top:1px solid var(--line);padding:10px clamp(16px,4vw,48px);z-index:5}
+.bar .in{max-width:1060px;margin:0 auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bar label{font-size:13.5px;color:var(--mut);display:flex;gap:6px;align-items:center;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);background:var(--txt);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--shadow);z-index:10;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%)}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--txt);padding:0;width:calc(100% - 32px);max-width:580px;box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:20px 22px}
+.dlg h2{margin:0 0 4px;font-size:20px}
+.dlg p{margin:0 0 12px;color:var(--mut);font-size:13.5px}
+.dlg a{color:var(--acc)}
+.klist{list-style:none;margin:0 0 14px;padding:0;border-top:1px solid var(--line)}
+.kitem,.kempty{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+.kempty{color:var(--mut)}
+.kinfo{flex:1;min-width:0}.kinfo b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kinfo small{color:var(--mut)}
+.kbtn{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.dlg label.f{display:block;font-size:12.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin:12px 0 4px}
+.dlg input[type=text],.dlg input[type=password],.dlg select{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.dlg input:focus,.dlg select:focus{outline:2px solid var(--acc);outline-offset:-1px}
+.dlg .acts{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.dlg .mini{font-size:13px;color:var(--mut);display:flex;gap:6px;align-items:center;margin-top:6px}
+#erroPre{max-height:48vh;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;margin:0}
+.foot{margin-top:40px;color:var(--fai);font-size:13px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="cover"></div>
+<main class="page">
+  <span class="icon">📝</span>
+  <h1>Redator PPE</h1>
+  <p class="sub">Escreva suas anotações do seu jeito. O sistema devolve o texto formal, pronto para copiar para o Portal do Articulador.</p>
+
+  <div class="row" id="tipos" role="group" aria-label="Tipo de registro"></div>
+
+  <div class="drop" id="drop">
+    <span>📂 Tem uma planilha de rascunho?</span>
+    <button class="btn" id="btnImport" type="button">Importar .xlsx</button>
+    <span style="font-size:13px">ou arraste o arquivo para cá</span>
+    <input type="file" id="file" accept=".xlsx,.xlsm" hidden>
+  </div>
+
+  <div class="props">
+    <div class="prop"><span>Título</span><div class="ro" id="titulo"></div><button class="btn sm" data-copy-prop="titulo" type="button">Copiar</button></div>
+    <div class="prop"><span>Data</span><input type="date" id="data"><button class="btn sm" data-copy-prop="data" type="button">Copiar</button></div>
+    <div class="prop"><span>Município</span><select id="municipio"></select><button class="btn sm" data-copy-prop="municipio" type="button">Copiar</button></div>
+    <div class="prop"><span>Tipo</span><div class="ro" id="tipoTxt"></div><button class="btn sm" data-copy-prop="tipoTxt" type="button">Copiar</button></div>
+  </div>
+
+  <div class="callout" id="avisos"><button class="x" id="avisosX" aria-label="Fechar" type="button">×</button><b>💡 Confira antes de copiar</b><ul id="avisosUl"></ul></div>
+
+  <div id="campos"></div>
+
+  <p class="foot">Dica: o texto formal é editável. Ajuste o que quiser antes de copiar. Revise sempre os nomes, números e datas.</p>
+</main>
+
+<div class="bar"><div class="in">
+  <button class="btn pri" id="btnTudo" type="button">✨ Reescrever tudo</button>
+  <button class="btn" id="btnCopiarTudo" type="button">📋 Copiar tudo</button>
+  <label><input type="checkbox" id="linha"> Copiar itens em linha única</label>
+  <span class="spacer"></span>
+  <button class="btn" id="btnChaves" type="button">⚙️ Chaves de API</button>
+  <button class="btn" id="btnLimpar" type="button">🧹 Limpar</button>
+</div></div>
+<dialog id="dlg"><div class="dlg">
+  <h2>⚙️ Chaves de API</h2>
+  <p>As chaves ficam salvas só neste navegador e seguem para o seu servidor apenas para fazer cada reescrita. Usadas na ordem da lista; se uma atingir o limite, passa para a próxima. Chaves grátis: <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> e <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini</a>.</p>
+  <ul class="klist" id="kList"></ul>
+  <label class="f" for="kNome">Nome da chave</label>
+  <input type="text" id="kNome" placeholder="ex: Groq principal" autocomplete="off" maxlength="60">
+  <label class="f" for="kChave">Chave API</label>
+  <input type="password" id="kChave" placeholder="Cole a chave aqui" autocomplete="off" spellcheck="false">
+  <label class="mini"><input type="checkbox" id="kMostrar"> Mostrar chave</label>
+  <label class="f" for="kProv">Provedor</label>
+  <select id="kProv"><option value="">Detectar automaticamente</option><option value="groq">Groq</option><option value="gemini">Gemini (Google)</option><option value="anthropic">Claude (Anthropic)</option></select>
+  <div class="acts"><button class="btn" id="kFechar" type="button">Fechar</button><button class="btn pri" id="kAdd" type="button">Adicionar chave</button></div>
+</div></dialog>
+<dialog id="dlgErro"><div class="dlg" style="max-width:none">
+  <h2>🛠️ Detalhes técnicos do erro</h2>
+  <p>Copie este relatório (ou tire um print) e envie ao Claude. As chaves de API são ocultadas automaticamente.</p>
+  <pre id="erroPre"></pre>
+  <div class="acts"><button class="btn" id="erroFechar" type="button">Fechar</button><button class="btn pri" id="erroCopiar" type="button">Copiar relatório</button></div>
+</div></dialog>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+'use strict';
+const TITULOS = {
+  semanal: 'Relatório Semanal',
+  territorial: 'Registro Territorial',
+  outro: 'Outro Registro',
+};
+
+// formato: "lista" = itens iniciados por "- ", um por linha | "prosa" = texto corrido | "frase" = frase curta
+const CAMPOS = {
+  semanal: {
+    pendencias: {
+      nome: 'Pendências anteriores',
+      guia: 'Atividades, retornos ou encaminhamentos de semanas anteriores que ainda estão em aberto ou aguardando resolução.',
+      formato: 'lista',
+    },
+    atividades: {
+      nome: 'Principais atividades da semana',
+      guia: 'Principais atividades realizadas durante a semana. Cada atividade vira um item iniciado por "Foi" / "Foram" (voz passiva).',
+      formato: 'lista',
+    },
+    avancos: {
+      nome: 'Avanços da semana',
+      guia: 'O que avançou ou produziu algum resultado relevante. Itens iniciados por "Foi" / "Foram" quando forem ações concluídas.',
+      formato: 'lista',
+    },
+    atencao: {
+      nome: 'Pontos de atenção',
+      guia: 'Dificuldades, situações ou pendências que precisam da atenção da equipe PPE.',
+      formato: 'lista',
+    },
+    proximos: {
+      nome: 'Próximos passos',
+      guia: 'Atividades ou encaminhamentos da próxima semana. Use verbos no infinitivo (ex.: "Acompanhar...", "Participar...", "Aguardar...").',
+      formato: 'lista',
+    },
+    extras: {
+      nome: 'Extras',
+      guia: 'Outras informações relevantes da semana: percepções, oportunidades ou acontecimentos importantes.',
+      formato: 'prosa',
+    },
+  },
+  territorial: {
+    aconteceu: {
+      nome: 'O que aconteceu?',
+      guia: 'Descrição breve da atividade ou situação registrada e seu objetivo. Itens iniciados por "Foi" / "Foram" (voz passiva).',
+      formato: 'lista',
+    },
+    envolvidos: {
+      nome: 'Quem esteve envolvido?',
+      guia: 'Pessoas, grupos, instituições ou parceiros. Escreva em uma única frase, com os envolvidos separados por ponto e vírgula, cargo antes do nome (ex.: "o prefeito municipal, Fulano de Tal; o secretário municipal de Agricultura, Beltrano; e o articulador local do PPE.").',
+      formato: 'prosa',
+    },
+    informacoes: {
+      nome: 'Principais informações',
+      guia: 'Principais assuntos, informações, demandas ou decisões identificados durante a atividade. Itens iniciados por "Foi" / "Foram" (voz passiva) quando forem fatos ou decisões.',
+      formato: 'lista',
+    },
+    atencao: {
+      nome: 'Pontos de atenção',
+      guia: 'Problema, dificuldade, oportunidade ou situação relevante que a equipe PPE precisa conhecer.',
+      formato: 'lista',
+    },
+    proximos: {
+      nome: 'Próximos passos',
+      guia: 'O que precisa acontecer, quem ficou responsável, prazo ou retorno previsto. Use verbos no infinitivo (ex.: "Promover...", "Acompanhar...").',
+      formato: 'lista',
+    },
+    extras: {
+      nome: 'Extras',
+      guia: 'Outras informações relevantes que não se encaixem nos tópicos anteriores.',
+      formato: 'prosa',
+    },
+  },
+  outro: {
+    assunto: {
+      nome: 'Assunto',
+      guia: 'Descrição breve do que está sendo registrado. Uma única frase nominal, sem começar com "Foi" (ex.: "Reunião com a equipe técnica do CRAS sobre o programa X, no município Y").',
+      formato: 'frase',
+    },
+    contexto: {
+      nome: 'Contexto',
+      guia: 'Informações necessárias para que a equipe PPE compreenda a situação. Texto corrido em voz passiva ("Foi realizada...", "Foi repassado ao articulador..."); se houver enumeração de assuntos tratados, pode listar com "- ".',
+      formato: 'prosa',
+    },
+    proximos: {
+      nome: 'Próximos passos',
+      guia: 'O que precisa acontecer, quem ficou responsável, prazo ou retorno previsto. Use verbos no infinitivo.',
+      formato: 'lista',
+    },
+    extras: {
+      nome: 'Extras',
+      guia: 'Outras informações que o articulador considerar importantes.',
+      formato: 'prosa',
+    },
+  },
+};
+
+const SISTEMA = `Você é um revisor e redator técnico de relatórios do PPE (Pacto pela Economia), programa em que articuladores locais registram, em municípios do Piauí, suas atividades junto a prefeituras, secretarias, associações, sindicatos e órgãos estaduais e federais.
+
+Você recebe anotações informais do articulador, escritas com as próprias palavras dele, possivelmente com erros de digitação, sem acentos, sem pontuação e sem letras maiúsculas. Sua tarefa é reescrevê-las em linguagem formal, técnica e impessoal, pronta para colar no relatório oficial.
+
+REGRAS (em ordem de prioridade):
+
+1. FIDELIDADE ABSOLUTA AO SENTIDO. Não acrescente, não remova e não altere nenhum fato, nome, cargo, número, quantidade, data, local, sigla, valor, decisão ou relação de causa e efeito. Não deduza nada que não esteja escrito. Não suavize nem reforce o que foi dito. Não explique siglas que o articulador não explicou. Se o articulador explicou algo (ex.: o que significa uma sigla), mantenha a explicação.
+2. DÚVIDAS. Quando algo estiver ambíguo, ilegível ou parecer erro (nome que pode estar grafado errado, número estranho, frase sem sentido claro), mantenha o trecho o mais próximo possível do original e registre a dúvida em "avisos", citando o trecho. Nunca "adivinhe" para resolver a dúvida.
+3. CORREÇÃO FORMAL. Corrija ortografia, acentuação, pontuação, concordância e uso de maiúsculas (inclusive nomes próprios de pessoas, municípios, instituições e siglas, como BADESPI, SEI, SINE-PI, CRAS, PPE). Nomes de pessoas: apenas capitalize e acentue quando for evidente; se não tiver certeza da grafia, mantenha e avise.
+4. TOM. Formal, técnico, impessoal, em terceira pessoa. Prefira a voz passiva com "Foi" / "Foram" para ações realizadas ("Foi realizada visita técnica à Secretaria...", "Foram discutidas as diretrizes..."), com concordância correta. O próprio articulador deve aparecer como "o articulador local do PPE" ou "o articulador" (nunca "eu" ou "nós"). Cargos em minúsculas quando precedem o nome ("o prefeito municipal, Fulano").
+5. SEM ENFEITE. Não use linguagem rebuscada, não crie introduções, conclusões, avaliações ou comentários. Mantenha o tamanho próximo ao do original, apenas organizado e corrigido.
+6. FORMATO por campo (cada campo informa o seu):
+   - "lista": um item por linha, cada linha iniciada por "- ". Todos os itens terminam com ponto e vírgula (;), exceto o último, que termina com ponto final (.). Se houver somente um assunto, escreva-o em texto corrido, sem "- ", terminado com ponto final.
+   - "prosa": texto corrido, em um ou mais parágrafos, sem marcadores (salvo enumeração clara do que foi tratado, que pode usar "- ").
+   - "frase": uma única frase curta, sem ponto final obrigatório.
+7. Cada campo deve conter somente o que foi anotado para ele. Não mova informações de um campo para outro, não repita informações entre campos.
+8. Se as anotações de um campo já estiverem em tom formal e corretas, apenas ajuste o que for necessário.
+9. Responda SEMPRE chamando a ferramenta "entregar_texto", com um texto para cada campo recebido e, em "avisos", no máximo 6 observações curtas (vazio se não houver dúvidas).`;
+
+
+// Grafias corretas de nomes e siglas (edite à vontade). Entram no prompt.
+const GLOSSARIO = [
+  'Admaelton Bezerra (prefeito municipal de São José do Piauí)',
+  'Manoel Nelson Borges (secretário municipal de Agricultura e Abastecimento)',
+  'Jakson de Sousa Silva (secretário municipal de Assistência Social e Cidadania)',
+  'Jaqueline de Moura Barbosa (agente administrativa)',
+  'Mário Philipe Martins da Paz (assistente de apoio do setor de abastecimento)',
+  'Josiel Manoel Mendes (secretário de finanças e administração do Sindicato dos Trabalhadores Rurais)',
+  'Siglas: PPE, BADESPI, SEI, ACT, SIM, SINE-PI, CRAS, PEP, SINTER, CAF, DAP, BNB, EMATER, PLANTI, SEPLAN, CIET, FAMEM, APPM, RFB, CIB',
+];
+
+// Exemplos de "rascunho -> texto final" (cada um: {campo, rascunho, final}). Quanto mais, melhor o estilo.
+const EXEMPLOS = [];
+
+
+
+const MUNICIPIOS=['Betânia do Piauí','Buriti dos Montes','Campo Largo do Piauí','Cocal dos Alves','Coronel José Dias','Cristino Castro','Ipiranga do Piauí','Jerumenha','Monsenhor Gil','São José do Peixe','São José do Piauí','Tanque do Piauí'];
+
+const TIPOS={
+  semanal:{rotulo:'Relatório semanal',titulo:'Relatório Semanal',tipoPortal:'Relatório semanal',campos:[
+    {k:'pendencias',nome:'Pendências anteriores',dica:'Atividades, retornos ou encaminhamentos de semanas anteriores ainda em aberto.',ph:'ex: ainda aguardando a liberacao do cadastro no sei...'},
+    {k:'atividades',nome:'Principais atividades da semana',obr:1,dica:'Liste o que foi feito na semana.',ph:'ex: visita na secretaria de agricultura pra perguntar se tem arado...'},
+    {k:'avancos',nome:'Avanços da semana',dica:'O que avançou ou produziu algum resultado relevante?',ph:''},
+    {k:'atencao',nome:'Pontos de atenção',dica:'Dificuldades ou pendências que a equipe PPE precisa conhecer.',vazio:'Sem pontos de atenção.',ph:''},
+    {k:'proximos',nome:'Próximos passos',obr:1,dica:'O que fazer na próxima semana?',ph:''},
+    {k:'extras',nome:'Extras',dica:'Percepções, oportunidades ou acontecimentos importantes.',ph:''},
+    {k:'evidencias',nome:'Evidências | Materiais',semIA:1,dica:'Links do Drive. Copiado sem alterações.',ph:'https://drive.google.com/...'}]},
+  territorial:{rotulo:'Registro territorial',titulo:'Registro Territorial',tipoPortal:'Registro territorial',campos:[
+    {k:'aconteceu',nome:'O que aconteceu?',obr:1,dica:'Descreva brevemente a atividade ou situação e seu objetivo.',ph:'ex: reuniao com o prefeito sobre o selo sim...'},
+    {k:'envolvidos',nome:'Quem esteve envolvido?',dica:'Pessoas, grupos, instituições ou parceiros.',ph:'ex: prefeito fulano, secretario de agricultura...'},
+    {k:'informacoes',nome:'Principais informações',obr:1,dica:'Assuntos, demandas ou decisões identificados.',ph:''},
+    {k:'atencao',nome:'Pontos de atenção',dica:'Problema, dificuldade ou oportunidade que a equipe PPE precisa conhecer. Pode ficar em branco.',ph:''},
+    {k:'proximos',nome:'Próximos passos',dica:'O que precisa acontecer, quem é responsável, prazo.',ph:''},
+    {k:'extras',nome:'Extras',dica:'Outras informações relevantes.',ph:''},
+    {k:'evidencias',nome:'Evidências | Materiais',semIA:1,dica:'Links do Drive. Copiado sem alterações.',ph:'https://drive.google.com/...'}]},
+  outro:{rotulo:'Outro registro',titulo:'Outro Registro',tipoPortal:'Outro registro',campos:[
+    {k:'assunto',nome:'Assunto',obr:1,dica:'Descreva brevemente o que está sendo registrado.',ph:'ex: reuniao com a equipe do cras sobre o auxilio alimentacao...'},
+    {k:'contexto',nome:'Contexto',obr:1,dica:'Explique o necessário para a equipe PPE entender a situação.',ph:''},
+    {k:'proximos',nome:'Próximos passos',obr:1,dica:'O que precisa acontecer, quem é responsável, prazo.',ph:''},
+    {k:'extras',nome:'Extras',obr:1,dica:'Outras informações importantes.',vazio:'Não há informações extras.',ph:''},
+    {k:'evidencias',nome:'Evidências | Materiais',semIA:1,dica:'Links do Drive. Pode ficar em branco.',ph:'https://drive.google.com/...'}]}
+};
+
+const KEY='ppe-redator-v1';
+const hoje=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+let S={tipo:'semanal',data:hoje(),municipio:'São José do Piauí',inputs:{semanal:{},territorial:{},outro:{}},outputs:{semanal:{},territorial:{},outro:{}},linha:false,codigo:''};
+try{const sv=JSON.parse(localStorage.getItem(KEY)||'null');if(sv&&sv.inputs)S=Object.assign(S,sv)}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+const $=id=>document.getElementById(id);
+const toastEl=$('toast');let tt;
+function toast(m){toastEl.textContent=m;toastEl.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>toastEl.classList.remove('show'),2400)}
+function grow(t){t.style.height='auto';t.style.height=Math.max(96,t.scrollHeight+2)+'px'}
+function brDate(iso){const p=(iso||'').split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:''}
+
+async function copiar(txt){
+  try{await navigator.clipboard.writeText(txt)}
+  catch(e){const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}
+  toast('Copiado!');
+}
+const comLinha=txt=>S.linha?txt.replace(/\s*\n+\s*/g,' '):txt;
+
+/* ---------- construção da tela ---------- */
+function renderTipos(){
+  const c=$('tipos');c.innerHTML='';
+  Object.keys(TIPOS).forEach(k=>{
+    const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=TIPOS[k].rotulo;
+    b.setAttribute('aria-pressed',String(k===S.tipo));
+    b.onclick=()=>{S.tipo=k;save();renderTudo()};
+    c.appendChild(b);
+  });
+}
+function renderProps(){
+  const t=TIPOS[S.tipo];
+  $('titulo').textContent=t.titulo+' / '+S.municipio;
+  $('tipoTxt').textContent=t.tipoPortal;
+  $('data').value=S.data;
+  $('municipio').value=S.municipio;
+}
+function valorSaida(c){
+  const v=(S.outputs[S.tipo][c.k]||'');
+  return v;
+}
+function renderCampos(){
+  const t=TIPOS[S.tipo],box=$('campos');box.innerHTML='';
+  t.campos.forEach(c=>{
+    const sec=document.createElement('section');sec.className='field';sec.dataset.k=c.k;
+    const head=`<div class="fhead"><span class="fname">${c.nome}${c.obr?' <i>*</i>':''}</span><span class="fhint">${c.dica}</span></div>`;
+    if(c.semIA){
+      sec.innerHTML=head+`<div class="col"><div class="clabel"><span class="spacer"></span><button class="btn sm" data-act="copy" type="button">Copiar</button></div><textarea data-in placeholder="${c.ph}"></textarea></div>`;
+    }else{
+      sec.innerHTML=head+`<div class="cols">
+        <div class="col"><div class="clabel">✍️ Suas anotações</div><textarea data-in placeholder="${c.ph||'Escreva do seu jeito, pode errar à vontade.'}"></textarea></div>
+        <div class="col"><div class="clabel">✅ Texto formal<span class="spacer"></span><button class="btn sm" data-act="redo" type="button">↻ Refazer</button><button class="btn sm" data-act="copy" type="button">Copiar</button></div><textarea class="out" data-out placeholder="${c.vazio?'Se ficar vazio, será usado: '+c.vazio:'O texto formal aparece aqui.'}"></textarea></div>
+      </div>`;
+    }
+    box.appendChild(sec);
+    const ti=sec.querySelector('[data-in]');ti.value=S.inputs[S.tipo][c.k]||'';
+    const to=sec.querySelector('[data-out]');if(to)to.value=valorSaida(c);
+    [ti,to].forEach(x=>x&&grow(x));
+  });
+}
+function renderTudo(){renderTipos();renderProps();renderCampos();$('linha').checked=!!S.linha;$('avisos').classList.remove('show')}
+
+/* ---------- eventos ---------- */
+$('campos').addEventListener('input',e=>{
+  const ta=e.target;if(ta.tagName!=='TEXTAREA')return;
+  const k=ta.closest('.field').dataset.k;grow(ta);
+  if(ta.hasAttribute('data-in'))S.inputs[S.tipo][k]=ta.value;else S.outputs[S.tipo][k]=ta.value;
+  save();
+});
+$('campos').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]');if(!b)return;
+  const sec=b.closest('.field'),k=sec.dataset.k,c=TIPOS[S.tipo].campos.find(x=>x.k===k);
+  if(b.dataset.act==='redo')reescrever([k]);
+  else{
+    const ta=sec.querySelector(c.semIA?'[data-in]':'[data-out]');
+    let v=ta.value.trim();if(!v&&c.vazio)v=c.vazio;
+    if(!v){toast('Nada para copiar ainda.');return}
+    copiar(comLinha(v));
+  }
+});
+$('data').onchange=e=>{S.data=e.target.value;save()};
+$('municipio').onchange=e=>{S.municipio=e.target.value;save();renderProps()};
+$('linha').onchange=e=>{S.linha=e.target.checked;save()};
+document.querySelector('.props').addEventListener('click',e=>{
+  const b=e.target.closest('[data-copy-prop]');if(!b)return;
+  const id=b.dataset.copyProp;
+  copiar(id==='data'?brDate(S.data):$(id).value||$(id).textContent);
+});
+$('avisosX').onclick=()=>$('avisos').classList.remove('show');
+
+$('btnCopiarTudo').onclick=()=>{
+  const t=TIPOS[S.tipo];
+  const partes=[`${t.titulo} / ${S.municipio}`,`Data: ${brDate(S.data)}`,`Município: ${S.municipio}`,`Tipo: ${t.tipoPortal}`];
+  t.campos.forEach(c=>{
+    let v=(c.semIA?(S.inputs[S.tipo][c.k]||''):(S.outputs[S.tipo][c.k]||'')).trim();
+    if(!v&&c.vazio)v=c.vazio;
+    if(v)partes.push('\n'+c.nome.toUpperCase()+'\n'+comLinha(v));
+  });
+  copiar(partes.join('\n'));
+};
+$('btnLimpar').onclick=()=>{
+  if(!confirm('Limpar todos os campos deste tipo de registro?'))return;
+  S.inputs[S.tipo]={};S.outputs[S.tipo]={};save();renderCampos();$('avisos').classList.remove('show');
+};
+
+/* ---------- reescrita (IA) ---------- */
+function marcar(keys,on){
+  keys.forEach(k=>{const o=document.querySelector(`.field[data-k="${k}"] [data-out]`);if(o)o.classList.toggle('wait',on)});
+}
+let ocupado=false;
+async function reescrever(keys,tentou){
+  if(ocupado)return;
+  const t=TIPOS[S.tipo];
+  const campos={};
+  keys.forEach(k=>{const v=(S.inputs[S.tipo][k]||'').trim();if(v)campos[k]=v});
+  if(!Object.keys(campos).length){toast('Escreva suas anotações primeiro.');return}
+  ocupado=true;marcar(keys,true);
+  const btn=$('btnTudo'),antes=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin"></span> Reescrevendo…';
+  try{
+    const d=await chamarReescrita(campos);
+    if(d.acesso){
+      ocupado=false;marcar(keys,false);btn.disabled=false;btn.innerHTML=antes;
+      if(tentou)return toast('Código de acesso inválido.');
+      const c=prompt('Digite o código de acesso:');
+      if(c){S.codigo=c.trim();save();return await reescrever(keys,true)}
+      return;
+    }
+    keys.forEach(k=>{
+      const c=t.campos.find(x=>x.k===k);if(c.semIA)return;
+      S.outputs[S.tipo][k]=(d.campos&&d.campos[k])||'';
+    });
+    save();renderCampos();
+    const av=d.avisos||[];
+    $('avisosUl').innerHTML='';
+    av.forEach(a=>{const li=document.createElement('li');li.textContent=a;$('avisosUl').appendChild(li)});
+    $('avisos').classList.toggle('show',av.length>0);
+    toast(av.length?'Pronto. Veja os avisos de conferência.':'Pronto!');
+  }catch(e){
+    falha(e,'Reescrever campos: '+keys.join(', '));
+  }finally{
+    if(ocupado){ocupado=false;marcar(keys,false);btn.disabled=false;btn.innerHTML=antes}
+  }
+}
+$('btnTudo').onclick=()=>reescrever(TIPOS[S.tipo].campos.filter(c=>!c.semIA).map(c=>c.k));
+
+/* ---------- importar planilha ---------- */
+const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[*?]/g,'').replace(/\s+/g,' ').trim().toUpperCase();
+const ROTULOS={'PENDENCIAS ANTERIORES':'pendencias','PRINCIPAIS ATIVIDADES DA SEMANA':'atividades','AVANCOS DA SEMANA':'avancos','PONTOS DE ATENCAO':'atencao','PROXIMOS PASSOS':'proximos','EXTRAS':'extras','EVIDENCIAS | MATERIAIS':'evidencias','O QUE ACONTECEU':'aconteceu','QUEM ESTEVE ENVOLVIDO':'envolvidos','PRINCIPAIS INFORMACOES':'informacoes','ASSUNTO':'assunto','CONTEXTO':'contexto'};
+const ESPECIAIS=['DATA','MUNICIPIO','TIPO'];
+
+function serialParaISO(n){
+  const d=new Date(Math.round((n-25569)*86400*1000));
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+}
+const MESES=['janeiro','fevereiro','marco','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function textoParaISO(s){
+  let m=String(s).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(m)return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  m=norm(s).toLowerCase().match(/(\d{1,2}) de ([a-z]+) de (\d{4})/);
+  const i=m?MESES.indexOf(m[2]):-1;
+  return i>=0?m[3]+'-'+String(i+1).padStart(2,'0')+'-'+m[1].padStart(2,'0'):'';
+}
+function importar(buf){
+  if(!window.XLSX){toast('Biblioteca de planilhas não carregou. Verifique a internet.');return}
+  let wb;try{wb=XLSX.read(buf,{type:'array'})}catch(e){toast('Não consegui abrir esse arquivo.');return}
+  const nome=wb.SheetNames.find(n=>/rascunho/i.test(n))||wb.SheetNames[0];
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[nome],{header:1,raw:true,defval:''});
+  const achados={},esp={};
+  for(let r=0;r<rows.length;r++){
+    for(let c=0;c<(rows[r]||[]).length;c++){
+      const n=norm(rows[r][c]);if(!n)continue;
+      const k=ROTULOS[n],isEsp=ESPECIAIS.includes(n);
+      if(!k&&!isEsp)continue;
+      let v=(rows[r+1]||[])[c];
+      if(v==null)v='';
+      if(typeof v==='string'&&(ROTULOS[norm(v)]||ESPECIAIS.includes(norm(v))))v='';
+      if(k){if(!(k in achados))achados[k]=typeof v==='string'?v.trim():String(v)}
+      else if(!(n in esp))esp[n]=v;
+    }
+  }
+  let tipo=null;
+  if('pendencias' in achados||'atividades' in achados)tipo='semanal';
+  else if('aconteceu' in achados||'informacoes' in achados)tipo='territorial';
+  else if('assunto' in achados||'contexto' in achados)tipo='outro';
+  else{const tv=norm(esp.TIPO);tipo=tv.includes('SEMANAL')?'semanal':tv.includes('TERRITORIAL')?'territorial':tv.includes('OUTRO')?'outro':null}
+  if(!tipo){toast('Não reconheci o modelo dessa planilha.');return}
+  S.tipo=tipo;
+  const permitidos=TIPOS[tipo].campos.map(c=>c.k);
+  S.inputs[tipo]={};S.outputs[tipo]={};
+  Object.keys(achados).forEach(k=>{if(permitidos.includes(k)&&achados[k])S.inputs[tipo][k]=achados[k]});
+  if(esp.DATA!==undefined&&esp.DATA!==''){
+    const iso=typeof esp.DATA==='number'?serialParaISO(esp.DATA):textoParaISO(esp.DATA);
+    if(iso)S.data=iso;
+  }
+  const m=MUNICIPIOS.find(x=>norm(x)===norm(esp.MUNICIPIO));if(m)S.municipio=m;
+  save();renderTudo();
+  toast('Planilha importada ('+TIPOS[tipo].rotulo.toLowerCase()+'). Clique em “Reescrever tudo”.');
+}
+const fileIn=$('file');
+$('btnImport').onclick=()=>fileIn.click();
+fileIn.onchange=()=>{const f=fileIn.files[0];if(f)f.arrayBuffer().then(importar);fileIn.value=''};
+const drop=$('drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)f.arrayBuffer().then(importar)});
+
+/* ---------- chaves de API ---------- */
+const PROV={groq:'Groq',gemini:'Gemini',anthropic:'Claude'};
+let K=[];try{K=JSON.parse(localStorage.getItem('ppe-chaves-v1')||'[]')}catch(e){}
+const saveK=()=>{try{localStorage.setItem('ppe-chaves-v1',JSON.stringify(K))}catch(e){}};
+const detectar=k=>/^gsk_/.test(k)?'groq':/^sk-ant-/.test(k)?'anthropic':/^AIza/.test(k)?'gemini':'';
+function chavesAtivas(){return K.filter(x=>x.ativa).map(x=>({nome:x.nome,provedor:x.provedor,chave:x.chave,ativa:true}))}
+function renderChaves(){
+  const ul=$('kList');ul.innerHTML='';
+  if(!K.length){const li=document.createElement('li');li.className='kempty';li.textContent='Nenhuma chave cadastrada. Se o servidor tiver chaves próprias, elas serão usadas.';ul.appendChild(li);return}
+  K.forEach((x,i)=>{
+    const li=document.createElement('li');li.className='kitem';li.dataset.i=i;
+    li.innerHTML='<input type="checkbox" data-a="on" title="Ativa"><div class="kinfo"><b></b><small></small></div><div class="kbtn"><button class="btn sm" data-a="up" type="button">↑</button><button class="btn sm" data-a="down" type="button">↓</button><button class="btn sm" data-a="test" type="button">Testar</button><button class="btn sm" data-a="del" type="button">Excluir</button></div>';
+    li.querySelector('input').checked=!!x.ativa;
+    li.querySelector('b').textContent=x.nome;
+    li.querySelector('small').textContent=PROV[x.provedor]+' · ••••'+x.chave.slice(-4)+(x.ativa?'':' · desativada');
+    ul.appendChild(li);
+  });
+}
+$('btnChaves').onclick=()=>{renderChaves();$('dlg').showModal()};
+$('kFechar').onclick=()=>$('dlg').close();
+$('kMostrar').onchange=e=>{$('kChave').type=e.target.checked?'text':'password'};
+$('kAdd').onclick=()=>{
+  const chave=$('kChave').value.trim(),prov=$('kProv').value||detectar(chave);
+  if(chave.length<10||/\s/.test(chave)){toast('Cole uma chave válida (sem espaços).');return}
+  if(!prov){toast('Não reconheci o provedor. Escolha na lista.');return}
+  if(K.some(x=>x.chave===chave)){toast('Essa chave já está cadastrada.');return}
+  const nome=$('kNome').value.trim()||(PROV[prov]+' '+(K.filter(x=>x.provedor===prov).length+1));
+  K.push({nome,provedor:prov,chave,ativa:true});saveK();
+  $('kNome').value='';$('kChave').value='';$('kProv').value='';renderChaves();toast('Chave adicionada.');
+};
+$('kList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const i=+b.closest('.kitem').dataset.i,a=b.dataset.a;
+  if(a==='on'){K[i].ativa=b.checked;saveK();renderChaves();return}
+  if(a==='up'&&i>0){[K[i-1],K[i]]=[K[i],K[i-1]]}
+  else if(a==='down'&&i<K.length-1){[K[i+1],K[i]]=[K[i],K[i+1]]}
+  else if(a==='del'){if(!confirm('Excluir a chave "'+K[i].nome+'"?'))return;K.splice(i,1)}
+  else if(a==='test'){testarChave(K[i]);return}
+  saveK();renderChaves();
+});
+
+
+/* ---------- chamada à IA: servidor e modo direto ---------- */
+class ErroTec extends Error{constructor(m,t){super(m);this.name='ErroTec';this.tent=t||[]}}
+function sistemaFinal(){
+  let s=SISTEMA.replace(/9\. Responda SEMPRE[\s\S]*$/,'9. Responda SOMENTE com um objeto JSON válido, sem markdown e sem nenhum texto fora dele, no formato {"campos":{"<chave>":"<texto formal>"},"avisos":["..."]}, com uma chave para cada campo recebido. Em "avisos", no máximo 6 observações curtas (lista vazia se não houver dúvidas).');
+  s+='\n\nGRAFIAS CORRETAS (use exatamente assim quando esses nomes aparecerem):\n- '+GLOSSARIO.join('\n- ');
+  if(EXEMPLOS.length){s+='\n\nEXEMPLOS DO ESTILO DESEJADO (rascunho -> texto final):';EXEMPLOS.forEach(e=>{s+='\n['+e.campo+']\nRascunho: '+e.rascunho+'\nFinal: '+e.final+'\n'})}
+  return s;
+}
+function montarMsg(tipo,municipio,campos){
+  const g=CAMPOS[tipo];let m='Tipo de registro: '+TITULOS[tipo]+'\n';
+  if(municipio)m+='Município: '+municipio+'\n';
+  m+='\nReescreva cada campo abaixo seguindo as regras.\n';
+  Object.keys(campos).forEach(k=>{m+='\n=== Campo "'+k+'" — '+g[k].nome+' ===\nOrientação do campo: '+g[k].guia+'\nFormato: '+g[k].formato+'\nAnotações do articulador:\n"""\n'+campos[k]+'\n"""\n'});
+  return m;
+}
+function lerJson(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)return null;try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}}
+const DIRETO={
+  groq:{url:'https://api.groq.com/openai/v1/chat/completions',headers:k=>({authorization:'Bearer '+k}),body:(s,m)=>({model:'llama-3.3-70b-versatile',temperature:.2,max_tokens:4096,response_format:{type:'json_object'},messages:[{role:'system',content:s},{role:'user',content:m}]}),texto:d=>d.choices[0].message.content},
+  gemini:{url:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',headers:k=>({'x-goog-api-key':k}),body:(s,m)=>({systemInstruction:{parts:[{text:s}]},contents:[{role:'user',parts:[{text:m}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}}),texto:d=>d.candidates[0].content.parts.map(p=>p.text||'').join('')},
+  anthropic:{url:'https://api.anthropic.com/v1/messages',headers:k=>({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}),body:(s,m)=>({model:'claude-sonnet-5-5',max_tokens:4096,system:s,messages:[{role:'user',content:m}]}),texto:d=>d.content.filter(b=>b.type==='text').map(b=>b.text).join('')}
+};
+async function tentarServidor(corpo,tent){
+  const url=new URL('/api/rewrite',location.href).href;
+  try{
+    const r=await fetch('/api/rewrite',{method:'POST',headers:{'content-type':'application/json','x-access-code':S.codigo||''},body:JSON.stringify(corpo)});
+    const txt=await r.text();let d=null;try{d=JSON.parse(txt)}catch(e){}
+    if(r.status===401)return{acesso:true};
+    if(r.ok&&d)return{d};
+    tent.push({etapa:'Servidor',url,status:r.status+' '+r.statusText,corpo:txt.slice(0,800)});
+    return{indisponivel:!d||r.status===404||r.status===405};
+  }catch(e){
+    tent.push({etapa:'Servidor',url,erro:e.name+': '+e.message});
+    return{indisponivel:true};
+  }
+}
+async function direto(item,sis,msg,tent){
+  const f=DIRETO[item.provedor],reg={etapa:'Direto do navegador → '+PROV[item.provedor]+' ("'+item.nome+'")',url:f.url};let txt='';
+  try{
+    const r=await fetch(f.url,{method:'POST',headers:Object.assign({'content-type':'application/json'},f.headers(item.chave)),body:JSON.stringify(f.body(sis,msg))});
+    txt=await r.text();reg.status=r.status+' '+r.statusText;
+    if(!r.ok){reg.corpo=txt.slice(0,800);tent.push(reg);return null}
+    const out=f.texto(JSON.parse(txt)),obj=lerJson(out);
+    if(!obj||typeof obj.campos!=='object'||!obj.campos){reg.erro='A IA respondeu fora do formato JSON esperado';reg.corpo=String(out).slice(0,800);tent.push(reg);return null}
+    return{campos:obj.campos,avisos:Array.isArray(obj.avisos)?obj.avisos.slice(0,6):[],motor:item.nome+' (direto)'};
+  }catch(e){reg.erro=e.name+': '+e.message;if(txt)reg.corpo=txt.slice(0,800);tent.push(reg);return null}
+}
+async function chamarReescrita(campos){
+  const tent=[],chaves=chavesAtivas();
+  const s=await tentarServidor({tipo:S.tipo,municipio:S.municipio,campos,chaves},tent);
+  if(s.acesso)return{acesso:true};
+  if(s.d)return s.d;
+  if(!s.indisponivel)throw new ErroTec('O servidor respondeu com erro',tent);
+  if(!chaves.length){tent.push({etapa:'Modo direto',erro:'Nenhuma chave ativa em ⚙️ Chaves de API; sem servidor não há como reescrever.'});throw new ErroTec('Servidor indisponível e nenhuma chave cadastrada',tent)}
+  const sis=sistemaFinal(),msg=montarMsg(S.tipo,S.municipio,campos);
+  for(const item of chaves){
+    const r=await direto(item,sis,msg,tent);
+    if(r){const o={};Object.keys(campos).forEach(k=>{o[k]=String(r.campos[k]||'').trim()});r.campos=o;return r}
+  }
+  throw new ErroTec('Falha no servidor e em todas as chaves (modo direto)',tent);
+}
+async function testarChave(x){
+  toast('Testando '+x.nome+'…');const tent=[];
+  try{
+    const s=await tentarServidor({teste:true,chaves:[{nome:x.nome,provedor:x.provedor,chave:x.chave,ativa:true}]},tent);
+    if(s.d&&s.d.ok){toast('✅ '+x.nome+' está funcionando (via servidor).');return}
+    if(s.acesso)throw new ErroTec('Código de acesso do servidor recusado (HTTP 401)',tent);
+    if(!s.indisponivel)throw new ErroTec('Teste da chave falhou no servidor',tent);
+    const r=await direto(x,'Responda somente com o JSON {"campos":{},"avisos":[]}.','teste',tent);
+    if(r){toast('✅ '+x.nome+' está funcionando (direto do navegador).');return}
+    throw new ErroTec('Teste da chave falhou (modo direto)',tent);
+  }catch(e){falha(e,'Testar chave "'+x.nome+'" ('+x.provedor+')')}
+}
+
+/* ---------- relatório técnico de erros ---------- */
+function diagnostico(tent){
+  const d=[];
+  if(location.protocol==='file:')d.push('A página foi aberta direto do disco (file://). A rota /api/rewrite só existe depois de publicada na Vercel; neste modo só funciona a chamada direta do navegador.');
+  tent.forEach(t=>{
+    const n=t.etapa,codes=[parseInt(t.status)||0].concat(((t.corpo||'').match(/HTTP (\d{3})/g)||[]).map(x=>+x.slice(5)));
+    if(t.erro&&/Failed to fetch|NetworkError|Load failed/i.test(t.erro))d.push(n+': a requisição não recebeu resposta (sem internet, bloqueio de CORS, antivírus/extensão ou endereço inacessível).');
+    if(t.etapa==='Servidor'&&(codes[0]===404||codes[0]===405))d.push('Servidor: a rota /api/rewrite não existe neste endereço (HTTP '+codes[0]+'). Confira se a pasta api/ foi enviada ao GitHub e se a Vercel foi reimplantada.');
+    codes.forEach(c=>{
+      if(c===401||c===403)d.push(n+': chave recusada (HTTP '+c+'): inválida, revogada ou sem permissão.');
+      if(c===429)d.push(n+': limite do plano gratuito atingido (HTTP 429).');
+      if(c===400)d.push(n+': requisição recusada (HTTP 400). Veja o corpo da resposta; pode ser modelo indisponível ou formato inválido.');
+      if(c===404&&t.etapa!=='Servidor')d.push(n+': modelo ou endereço não encontrado (HTTP 404). O modelo pode ter sido renomeado.');
+      if(c>=500)d.push(n+': erro interno do provedor (HTTP '+c+').');
+    });
+  });
+  return d.length?Array.from(new Set(d)):['Sem diagnóstico automático. Envie o relatório completo.'];
+}
+function relatorio(acao,e){
+  const tent=(e&&e.tent)||[],ativas=K.filter(x=>x.ativa).map(x=>x.nome+' ('+x.provedor+')').join(', ');
+  const L=['ERRO TÉCNICO — Redator PPE','Quando: '+new Date().toISOString(),'Ação: '+acao,'Página: '+location.href,'Protocolo: '+location.protocol+' | origem: '+location.origin,'Online (navigator.onLine): '+navigator.onLine,'Navegador: '+navigator.userAgent,'Chaves ativas: '+(ativas||'nenhuma'),'','TENTATIVAS ('+tent.length+'):'];
+  tent.forEach((t,i)=>{L.push((i+1)+') '+t.etapa);L.push('   URL: '+t.url);if(t.status)L.push('   Status: HTTP '+t.status);if(t.erro)L.push('   Erro: '+t.erro);if(t.corpo)L.push('   Resposta: '+t.corpo)});
+  if(!tent.length)L.push('   (nenhuma chamada de rede chegou a ser feita)');
+  L.push('','ERRO FINAL: '+((e&&e.name)||'Error')+': '+((e&&e.message)||String(e)));
+  if(e&&e.stack&&!(e instanceof ErroTec))L.push('Pilha: '+String(e.stack).split('\n').slice(0,4).join(' | '));
+  L.push('','DIAGNÓSTICO:');diagnostico(tent).forEach(x=>L.push('- '+x));
+  let t=L.join('\n');K.forEach(x=>{if(x.chave)t=t.split(x.chave).join('***['+x.nome+']***')});
+  return t;
+}
+function falha(e,acao){$('erroPre').textContent=relatorio(acao,e);if(!$('dlgErro').open)$('dlgErro').showModal();toast('Falhou. Detalhes técnicos abertos.')}
+$('erroFechar').onclick=()=>$('dlgErro').close();
+$('erroCopiar').onclick=()=>copiar($('erroPre').textContent);
+window.addEventListener('error',ev=>falha(ev.error||new Error(ev.message),'Erro inesperado na página ('+(ev.filename||'')+':'+(ev.lineno||'')+')'));
+window.addEventListener('unhandledrejection',ev=>falha(ev.reason instanceof Error?ev.reason:new Error(String(ev.reason)),'Promessa rejeitada sem tratamento'));
+
+/* ---------- início ---------- */
+const sel=$('municipio');
+MUNICIPIOS.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o)});
+if(!MUNICIPIOS.includes(S.municipio))S.municipio='São José do Piauí';
+renderTudo();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>

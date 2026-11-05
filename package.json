@@ -1,0 +1,7 @@
+{
+  "name": "ppe-redator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Redator de relatórios do PPE com interface estilo Notion",
+  "engines": { "node": ">=18" }
+}
