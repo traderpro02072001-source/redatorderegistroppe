@@ -158,38 +158,76 @@ async function postar(url, headers, corpo) {
   return d;
 }
 
+const PREF_GROQ = [/llama-3\.3-70b/, /gpt-oss-120b/, /llama-4/, /qwen/, /kimi/, /gpt-oss-20b/, /llama-3\.1-70b/, /llama-3\.1-8b/, /gemma/];
+const EXCLUI = /whisper|tts|guard|embed|orpheus|playai|safeguard|compound|moderation|image|vision|transcri|audio|live/i;
+// Escolhe o melhor modelo de texto entre os que a conta realmente possui.
+function escolherModelo(provedor, ids) {
+  ids = ids.filter((i) => !EXCLUI.test(i));
+  if (provedor === 'groq') {
+    for (const re of PREF_GROQ) { const m = ids.find((i) => re.test(i)); if (m) return m; }
+    return ids[0] || null;
+  }
+  if (provedor === 'gemini') {
+    const v = (i) => { const m = i.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+    const flash = ids.filter((i) => /flash/.test(i));
+    const estaveis = flash.filter((i) => !/lite|exp|thinking|preview|latest/.test(i)).sort((a, b) => v(b) - v(a));
+    return estaveis[0] || flash.sort((a, b) => v(b) - v(a))[0] || ids[0] || null;
+  }
+  if (provedor === 'anthropic') return ids.find((i) => /sonnet/.test(i)) || ids[0] || null;
+  return null;
+}
+
+async function obter(url, headers) {
+  const r = await fetch(url, { headers });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText || ''}: ` + JSON.stringify(d).slice(0, 300));
+  return d;
+}
+
+// Tenta o modelo padrão (ou o escolhido pelo usuário). Se a conta não o tiver (HTTP 400/404), lista os modelos e usa o melhor.
+async function usar(item, prov, padrao, enviar, listar, extrair) {
+  const inicial = item.modelo || padrao;
+  try {
+    item.usado = inicial;
+    return extrair(await enviar(inicial));
+  } catch (e) {
+    if (item.modelo || !/HTTP (400|404)/.test(e.message)) throw e;
+    let ids;
+    try { ids = await listar(); } catch (e2) { throw new Error(e.message + ' | falha ao listar modelos: ' + e2.message); }
+    const novo = escolherModelo(prov, ids);
+    if (!novo || novo === inicial) throw new Error(e.message + ' | modelos disponíveis: ' + ids.slice(0, 15).join(', '));
+    item.usado = novo;
+    return extrair(await enviar(novo));
+  }
+}
+
 const PROVEDORES = {
   groq: {
     chave: 'GROQ_API_KEY',
-    chamar: async (sistema, msg, chave) => {
-      const d = await postar('https://api.groq.com/openai/v1/chat/completions',
-        { authorization: 'Bearer ' + chave },
-        { model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile', temperature: 0.2, max_tokens: 4096,
-          response_format: { type: 'json_object' },
-          messages: [{ role: 'system', content: sistema }, { role: 'user', content: msg }] });
-      return d.choices[0].message.content;
-    },
+    chamar: (sistema, msg, chave, item) => usar(item, 'groq', process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      (modelo) => postar('https://api.groq.com/openai/v1/chat/completions', { authorization: 'Bearer ' + chave },
+        { model: modelo, temperature: 0.2, max_tokens: 4096, response_format: { type: 'json_object' },
+          messages: [{ role: 'system', content: sistema }, { role: 'user', content: msg }] }),
+      async () => (await obter('https://api.groq.com/openai/v1/models', { authorization: 'Bearer ' + chave })).data.map((x) => x.id),
+      (d) => d.choices[0].message.content),
   },
   gemini: {
     chave: 'GEMINI_API_KEY',
-    chamar: async (sistema, msg, chave) => {
-      const modelo = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-      const d = await postar(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`,
-        { 'x-goog-api-key': chave },
+    chamar: (sistema, msg, chave, item) => usar(item, 'gemini', process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      (modelo) => postar(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`, { 'x-goog-api-key': chave },
         { systemInstruction: { parts: [{ text: sistema }] }, contents: [{ role: 'user', parts: [{ text: msg }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } });
-      return d.candidates[0].content.parts.map((p) => p.text || '').join('');
-    },
+          generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }),
+      async () => (await obter('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { 'x-goog-api-key': chave }))
+        .models.filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => m.name.replace('models/', '')),
+      (d) => d.candidates[0].content.parts.map((p) => p.text || '').join('')),
   },
   anthropic: {
     chave: 'ANTHROPIC_API_KEY',
-    chamar: async (sistema, msg, chave) => {
-      const d = await postar('https://api.anthropic.com/v1/messages',
-        { 'x-api-key': chave, 'anthropic-version': '2023-06-01' },
-        { model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5', max_tokens: 4096, system: sistema,
-          messages: [{ role: 'user', content: msg }] });
-      return d.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    },
+    chamar: (sistema, msg, chave, item) => usar(item, 'anthropic', process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5',
+      (modelo) => postar('https://api.anthropic.com/v1/messages', { 'x-api-key': chave, 'anthropic-version': '2023-06-01' },
+        { model: modelo, max_tokens: 4096, system: sistema, messages: [{ role: 'user', content: msg }] }),
+      async () => (await obter('https://api.anthropic.com/v1/models', { 'x-api-key': chave, 'anthropic-version': '2023-06-01' })).data.map((x) => x.id),
+      (d) => d.content.filter((b) => b.type === 'text').map((b) => b.text).join('')),
   },
 };
 
@@ -212,7 +250,7 @@ module.exports = async (req, res) => {
   for (const c of Array.isArray(corpo.chaves) ? corpo.chaves.slice(0, 10) : []) {
     const chave = String(c && c.chave || '').trim();
     if (!c || c.ativa === false || !PROVEDORES[c.provedor] || chave.length < 10 || chave.length > 400 || /\s/.test(chave)) continue;
-    fila.push({ nome: limpar(c.nome).slice(0, 60) || c.provedor, provedor: c.provedor, chave });
+    fila.push({ nome: limpar(c.nome).slice(0, 60) || c.provedor, provedor: c.provedor, chave, modelo: /^[\w.\-\/:]{1,80}$/.test(c.modelo || '') ? c.modelo : '' });
   }
   const doCliente = fila.length;
   for (const p of (process.env.PROVEDORES || 'groq,gemini,anthropic').split(',').map((x) => x.trim())) {
@@ -226,8 +264,8 @@ module.exports = async (req, res) => {
     const item = fila[0];
     if (!doCliente) return res.status(400).json({ erro: 'Chave inválida.' });
     try {
-      await PROVEDORES[item.provedor].chamar('Responda somente com o JSON {"ok":true}.', 'teste', item.chave);
-      return res.status(200).json({ ok: true });
+      await PROVEDORES[item.provedor].chamar('Responda somente com o JSON {"ok":true}.', 'teste', item.chave, item);
+      return res.status(200).json({ ok: true, modelo: item.usado });
     } catch (e) {
       return res.status(502).json({ erro: String(e.message).split(item.chave).join('***') });
     }
@@ -264,13 +302,13 @@ module.exports = async (req, res) => {
   const erros = [];
   for (const item of fila) {
     try {
-      const texto = await PROVEDORES[item.provedor].chamar(sistema, mensagem, item.chave);
+      const texto = await PROVEDORES[item.provedor].chamar(sistema, mensagem, item.chave, item);
       const obj = lerJson(texto);
       if (!obj || typeof obj.campos !== 'object' || obj.campos === null) throw new Error('resposta fora do formato');
       const saida = {};
       for (const k of chaves) saida[k] = limpar(obj.campos[k]);
       const avisos = Array.isArray(obj.avisos) ? obj.avisos.map(limpar).filter(Boolean).slice(0, 6) : [];
-      return res.status(200).json({ campos: saida, avisos, motor: item.nome });
+      return res.status(200).json({ campos: saida, avisos, motor: `${item.nome} (${item.usado || ''})` });
     } catch (e) {
       erros.push(`${item.nome}: ` + String(e.message).split(item.chave).join('***'));
     }
