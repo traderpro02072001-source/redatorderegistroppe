@@ -145,6 +145,8 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
   <label class="mini"><input type="checkbox" id="kMostrar"> Mostrar chave</label>
   <label class="f" for="kProv">Provedor</label>
   <select id="kProv"><option value="">Detectar automaticamente</option><option value="groq">Groq</option><option value="gemini">Gemini (Google)</option><option value="anthropic">Claude (Anthropic)</option></select>
+  <label class="f" for="kModelo">Modelo (opcional)</label>
+  <input type="text" id="kModelo" placeholder="Deixe vazio para escolher automaticamente" autocomplete="off" maxlength="80">
   <div class="acts"><button class="btn" id="kFechar" type="button">Fechar</button><button class="btn pri" id="kAdd" type="button">Adicionar chave</button></div>
 </div></dialog>
 <dialog id="dlgErro"><div class="dlg" style="max-width:none">
@@ -453,7 +455,7 @@ async function reescrever(keys,tentou){
     $('avisosUl').innerHTML='';
     av.forEach(a=>{const li=document.createElement('li');li.textContent=a;$('avisosUl').appendChild(li)});
     $('avisos').classList.toggle('show',av.length>0);
-    toast(av.length?'Pronto. Veja os avisos de conferência.':'Pronto!');
+    toast((av.length?'Pronto. Veja os avisos de conferência.':'Pronto!')+(d.motor?' ['+d.motor+']':''));
   }catch(e){
     falha(e,'Reescrever campos: '+keys.join(', '));
   }finally{
@@ -528,7 +530,7 @@ const PROV={groq:'Groq',gemini:'Gemini',anthropic:'Claude'};
 let K=[];try{K=JSON.parse(localStorage.getItem('ppe-chaves-v1')||'[]')}catch(e){}
 const saveK=()=>{try{localStorage.setItem('ppe-chaves-v1',JSON.stringify(K))}catch(e){}};
 const detectar=k=>/^gsk_/.test(k)?'groq':/^sk-ant-/.test(k)?'anthropic':/^AIza/.test(k)?'gemini':'';
-function chavesAtivas(){return K.filter(x=>x.ativa).map(x=>({nome:x.nome,provedor:x.provedor,chave:x.chave,ativa:true}))}
+function chavesAtivas(){return K.filter(x=>x.ativa).map(x=>({nome:x.nome,provedor:x.provedor,chave:x.chave,modelo:x.modelo||'',ativa:true}))}
 function renderChaves(){
   const ul=$('kList');ul.innerHTML='';
   if(!K.length){const li=document.createElement('li');li.className='kempty';li.textContent='Nenhuma chave cadastrada. Se o servidor tiver chaves próprias, elas serão usadas.';ul.appendChild(li);return}
@@ -537,7 +539,7 @@ function renderChaves(){
     li.innerHTML='<input type="checkbox" data-a="on" title="Ativa"><div class="kinfo"><b></b><small></small></div><div class="kbtn"><button class="btn sm" data-a="up" type="button">↑</button><button class="btn sm" data-a="down" type="button">↓</button><button class="btn sm" data-a="test" type="button">Testar</button><button class="btn sm" data-a="del" type="button">Excluir</button></div>';
     li.querySelector('input').checked=!!x.ativa;
     li.querySelector('b').textContent=x.nome;
-    li.querySelector('small').textContent=PROV[x.provedor]+' · ••••'+x.chave.slice(-4)+(x.ativa?'':' · desativada');
+    li.querySelector('small').textContent=PROV[x.provedor]+' · ••••'+x.chave.slice(-4)+(x.modelo?' · '+x.modelo:'')+(x.ativa?'':' · desativada');
     ul.appendChild(li);
   });
 }
@@ -550,8 +552,8 @@ $('kAdd').onclick=()=>{
   if(!prov){toast('Não reconheci o provedor. Escolha na lista.');return}
   if(K.some(x=>x.chave===chave)){toast('Essa chave já está cadastrada.');return}
   const nome=$('kNome').value.trim()||(PROV[prov]+' '+(K.filter(x=>x.provedor===prov).length+1));
-  K.push({nome,provedor:prov,chave,ativa:true});saveK();
-  $('kNome').value='';$('kChave').value='';$('kProv').value='';renderChaves();toast('Chave adicionada.');
+  K.push({nome,provedor:prov,chave,modelo:$('kModelo').value.trim(),ativa:true});saveK();
+  $('kModelo').value='';$('kNome').value='';$('kChave').value='';$('kProv').value='';renderChaves();toast('Chave adicionada.');
 };
 $('kList').addEventListener('click',e=>{
   const b=e.target.closest('[data-a]');if(!b)return;
@@ -566,6 +568,25 @@ $('kList').addEventListener('click',e=>{
 
 
 /* ---------- chamada à IA: servidor e modo direto ---------- */
+const PREF_GROQ = [/llama-3\.3-70b/, /gpt-oss-120b/, /llama-4/, /qwen/, /kimi/, /gpt-oss-20b/, /llama-3\.1-70b/, /llama-3\.1-8b/, /gemma/];
+const EXCLUI = /whisper|tts|guard|embed|orpheus|playai|safeguard|compound|moderation|image|vision|transcri|audio|live/i;
+// Escolhe o melhor modelo de texto entre os que a conta realmente possui.
+function escolherModelo(provedor, ids) {
+  ids = ids.filter((i) => !EXCLUI.test(i));
+  if (provedor === 'groq') {
+    for (const re of PREF_GROQ) { const m = ids.find((i) => re.test(i)); if (m) return m; }
+    return ids[0] || null;
+  }
+  if (provedor === 'gemini') {
+    const v = (i) => { const m = i.match(/gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
+    const flash = ids.filter((i) => /flash/.test(i));
+    const estaveis = flash.filter((i) => !/lite|exp|thinking|preview|latest/.test(i)).sort((a, b) => v(b) - v(a));
+    return estaveis[0] || flash.sort((a, b) => v(b) - v(a))[0] || ids[0] || null;
+  }
+  if (provedor === 'anthropic') return ids.find((i) => /sonnet/.test(i)) || ids[0] || null;
+  return null;
+}
+
 class ErroTec extends Error{constructor(m,t){super(m);this.name='ErroTec';this.tent=t||[]}}
 function sistemaFinal(){
   let s=SISTEMA.replace(/9\. Responda SEMPRE[\s\S]*$/,'9. Responda SOMENTE com um objeto JSON válido, sem markdown e sem nenhum texto fora dele, no formato {"campos":{"<chave>":"<texto formal>"},"avisos":["..."]}, com uma chave para cada campo recebido. Em "avisos", no máximo 6 observações curtas (lista vazia se não houver dúvidas).');
@@ -582,10 +603,15 @@ function montarMsg(tipo,municipio,campos){
 }
 function lerJson(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)return null;try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}}
 const DIRETO={
-  groq:{url:'https://api.groq.com/openai/v1/chat/completions',headers:k=>({authorization:'Bearer '+k}),body:(s,m)=>({model:'llama-3.3-70b-versatile',temperature:.2,max_tokens:4096,response_format:{type:'json_object'},messages:[{role:'system',content:s},{role:'user',content:m}]}),texto:d=>d.choices[0].message.content},
-  gemini:{url:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',headers:k=>({'x-goog-api-key':k}),body:(s,m)=>({systemInstruction:{parts:[{text:s}]},contents:[{role:'user',parts:[{text:m}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}}),texto:d=>d.candidates[0].content.parts.map(p=>p.text||'').join('')},
-  anthropic:{url:'https://api.anthropic.com/v1/messages',headers:k=>({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}),body:(s,m)=>({model:'claude-sonnet-5-5',max_tokens:4096,system:s,messages:[{role:'user',content:m}]}),texto:d=>d.content.filter(b=>b.type==='text').map(b=>b.text).join('')}
+  groq:{padrao:'llama-3.3-70b-versatile',url:()=>'https://api.groq.com/openai/v1/chat/completions',lista:'https://api.groq.com/openai/v1/models',headers:k=>({authorization:'Bearer '+k}),body:(s,m,mod)=>({model:mod,temperature:.2,max_tokens:4096,response_format:{type:'json_object'},messages:[{role:'system',content:s},{role:'user',content:m}]}),texto:d=>d.choices[0].message.content,ids:d=>d.data.map(x=>x.id)},
+  gemini:{padrao:'gemini-2.5-flash',url:mod=>'https://generativelanguage.googleapis.com/v1beta/models/'+mod+':generateContent',lista:'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',headers:k=>({'x-goog-api-key':k}),body:(s,m)=>({systemInstruction:{parts:[{text:s}]},contents:[{role:'user',parts:[{text:m}]}],generationConfig:{temperature:.2,responseMimeType:'application/json'}}),texto:d=>d.candidates[0].content.parts.map(p=>p.text||'').join(''),ids:d=>d.models.filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace('models/',''))},
+  anthropic:{padrao:'claude-sonnet-5-5',url:()=>'https://api.anthropic.com/v1/messages',lista:'https://api.anthropic.com/v1/models',headers:k=>({'x-api-key':k,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'}),body:(s,m,mod)=>({model:mod,max_tokens:4096,system:s,messages:[{role:'user',content:m}]}),texto:d=>d.content.filter(b=>b.type==='text').map(b=>b.text).join(''),ids:d=>d.data.map(x=>x.id)}
 };
+async function http(url,opts){
+  const r=await fetch(url,opts),txt=await r.text();
+  if(!r.ok){const e=new Error('HTTP '+r.status+' '+r.statusText+': '+txt.slice(0,400));e.http=r.status;e.st=r.status+' '+r.statusText;e.corpo=txt.slice(0,800);throw e}
+  return JSON.parse(txt);
+}
 async function tentarServidor(corpo,tent){
   const url=new URL('/api/rewrite',location.href).href;
   try{
@@ -601,15 +627,22 @@ async function tentarServidor(corpo,tent){
   }
 }
 async function direto(item,sis,msg,tent){
-  const f=DIRETO[item.provedor],reg={etapa:'Direto do navegador → '+PROV[item.provedor]+' ("'+item.nome+'")',url:f.url};let txt='';
+  const f=DIRETO[item.provedor],reg={etapa:'Direto do navegador → '+PROV[item.provedor]+' ("'+item.nome+'")',url:f.url(item.modelo||f.padrao)};
+  const enviar=async mod=>{reg.url=f.url(mod);reg.modelo=mod;return f.texto(await http(f.url(mod),{method:'POST',headers:Object.assign({'content-type':'application/json'},f.headers(item.chave)),body:JSON.stringify(f.body(sis,msg,mod))}))};
   try{
-    const r=await fetch(f.url,{method:'POST',headers:Object.assign({'content-type':'application/json'},f.headers(item.chave)),body:JSON.stringify(f.body(sis,msg))});
-    txt=await r.text();reg.status=r.status+' '+r.statusText;
-    if(!r.ok){reg.corpo=txt.slice(0,800);tent.push(reg);return null}
-    const out=f.texto(JSON.parse(txt)),obj=lerJson(out);
+    let out;
+    try{out=await enviar(item.modelo||f.padrao)}
+    catch(e){
+      if(item.modelo||!(e.http===400||e.http===404))throw e;
+      let ids;try{ids=f.ids(await http(f.lista,{headers:f.headers(item.chave)}))}catch(e2){e.message+=' | falha ao listar modelos: '+e2.message;throw e}
+      const novo=escolherModelo(item.provedor,ids);
+      if(!novo||novo===(item.modelo||f.padrao)){e.message+=' | modelos disponíveis: '+ids.slice(0,15).join(', ');throw e}
+      out=await enviar(novo);
+    }
+    const obj=lerJson(out);
     if(!obj||typeof obj.campos!=='object'||!obj.campos){reg.erro='A IA respondeu fora do formato JSON esperado';reg.corpo=String(out).slice(0,800);tent.push(reg);return null}
-    return{campos:obj.campos,avisos:Array.isArray(obj.avisos)?obj.avisos.slice(0,6):[],motor:item.nome+' (direto)'};
-  }catch(e){reg.erro=e.name+': '+e.message;if(txt)reg.corpo=txt.slice(0,800);tent.push(reg);return null}
+    return{campos:obj.campos,avisos:Array.isArray(obj.avisos)?obj.avisos.slice(0,6):[],motor:item.nome+' ('+reg.modelo+', direto)'};
+  }catch(e){reg.erro=e.name+': '+e.message;if(e.st)reg.status=e.st;if(e.corpo)reg.corpo=e.corpo;tent.push(reg);return null}
 }
 async function chamarReescrita(campos){
   const tent=[],chaves=chavesAtivas();
@@ -628,7 +661,7 @@ async function chamarReescrita(campos){
 async function testarChave(x){
   toast('Testando '+x.nome+'…');const tent=[];
   try{
-    const s=await tentarServidor({teste:true,chaves:[{nome:x.nome,provedor:x.provedor,chave:x.chave,ativa:true}]},tent);
+    const s=await tentarServidor({teste:true,chaves:[{nome:x.nome,provedor:x.provedor,chave:x.chave,modelo:x.modelo||'',ativa:true}]},tent);
     if(s.d&&s.d.ok){toast('✅ '+x.nome+' está funcionando (via servidor).');return}
     if(s.acesso)throw new ErroTec('Código de acesso do servidor recusado (HTTP 401)',tent);
     if(!s.indisponivel)throw new ErroTec('Teste da chave falhou no servidor',tent);
@@ -643,14 +676,18 @@ function diagnostico(tent){
   const d=[];
   if(location.protocol==='file:')d.push('A página foi aberta direto do disco (file://). A rota /api/rewrite só existe depois de publicada na Vercel; neste modo só funciona a chamada direta do navegador.');
   tent.forEach(t=>{
-    const n=t.etapa,codes=[parseInt(t.status)||0].concat(((t.corpo||'').match(/HTTP (\d{3})/g)||[]).map(x=>+x.slice(5)));
+    const n=t.etapa,srv=t.etapa==='Servidor',st=parseInt(t.status)||0;
+    let cs=((t.corpo||t.erro||'').match(/HTTP (\d{3})/g)||[]).map(x=>+x.slice(5));
+    if(!srv&&st)cs.unshift(st);
     if(t.erro&&/Failed to fetch|NetworkError|Load failed/i.test(t.erro))d.push(n+': a requisição não recebeu resposta (sem internet, bloqueio de CORS, antivírus/extensão ou endereço inacessível).');
-    if(t.etapa==='Servidor'&&(codes[0]===404||codes[0]===405))d.push('Servidor: a rota /api/rewrite não existe neste endereço (HTTP '+codes[0]+'). Confira se a pasta api/ foi enviada ao GitHub e se a Vercel foi reimplantada.');
-    codes.forEach(c=>{
+    if(srv&&(st===404||st===405))d.push('Servidor: a rota /api/rewrite não existe neste endereço (HTTP '+st+'). Confira se a pasta api/ foi enviada ao GitHub e se a Vercel foi reimplantada.');
+    if(srv&&st===502)d.push('Servidor: a Vercel está funcionando, mas todos os provedores de IA falharam. A causa está na resposta acima.');
+    if(srv&&st===400)d.push('Servidor: '+((t.corpo||'').slice(0,200)));
+    Array.from(new Set(cs)).forEach(c=>{
       if(c===401||c===403)d.push(n+': chave recusada (HTTP '+c+'): inválida, revogada ou sem permissão.');
       if(c===429)d.push(n+': limite do plano gratuito atingido (HTTP 429).');
-      if(c===400)d.push(n+': requisição recusada (HTTP 400). Veja o corpo da resposta; pode ser modelo indisponível ou formato inválido.');
-      if(c===404&&t.etapa!=='Servidor')d.push(n+': modelo ou endereço não encontrado (HTTP 404). O modelo pode ter sido renomeado.');
+      if(c===400)d.push(n+': requisição recusada (HTTP 400). Veja a resposta; pode ser modelo sem suporte ao formato pedido.');
+      if(c===404)d.push(n+': modelo não encontrado (HTTP 404). O sistema tenta escolher outro automaticamente; se persistir, informe o nome do modelo na chave em ⚙️.');
       if(c>=500)d.push(n+': erro interno do provedor (HTTP '+c+').');
     });
   });
@@ -659,7 +696,7 @@ function diagnostico(tent){
 function relatorio(acao,e){
   const tent=(e&&e.tent)||[],ativas=K.filter(x=>x.ativa).map(x=>x.nome+' ('+x.provedor+')').join(', ');
   const L=['ERRO TÉCNICO — Redator PPE','Quando: '+new Date().toISOString(),'Ação: '+acao,'Página: '+location.href,'Protocolo: '+location.protocol+' | origem: '+location.origin,'Online (navigator.onLine): '+navigator.onLine,'Navegador: '+navigator.userAgent,'Chaves ativas: '+(ativas||'nenhuma'),'','TENTATIVAS ('+tent.length+'):'];
-  tent.forEach((t,i)=>{L.push((i+1)+') '+t.etapa);L.push('   URL: '+t.url);if(t.status)L.push('   Status: HTTP '+t.status);if(t.erro)L.push('   Erro: '+t.erro);if(t.corpo)L.push('   Resposta: '+t.corpo)});
+  tent.forEach((t,i)=>{L.push((i+1)+') '+t.etapa);L.push('   URL: '+t.url);if(t.modelo)L.push('   Modelo: '+t.modelo);if(t.status)L.push('   Status: HTTP '+t.status);if(t.erro)L.push('   Erro: '+t.erro);if(t.corpo)L.push('   Resposta: '+t.corpo)});
   if(!tent.length)L.push('   (nenhuma chamada de rede chegou a ser feita)');
   L.push('','ERRO FINAL: '+((e&&e.name)||'Error')+': '+((e&&e.message)||String(e)));
   if(e&&e.stack&&!(e instanceof ErroTec))L.push('Pilha: '+String(e.stack).split('\n').slice(0,4).join(' | '));
