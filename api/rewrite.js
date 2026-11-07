@@ -19,36 +19,12 @@ const TITULOS = {
 // formato: "lista" = itens iniciados por "- ", um por linha | "prosa" = texto corrido | "frase" = frase curta
 const CAMPOS = {
   semanal: {
-    pendencias: {
-      nome: 'Pendências anteriores',
-      guia: 'Atividades, retornos ou encaminhamentos de semanas anteriores que ainda estão em aberto ou aguardando resolução.',
-      formato: 'lista',
-    },
-    atividades: {
-      nome: 'Principais atividades da semana',
-      guia: 'Principais atividades realizadas durante a semana. Cada atividade vira um item iniciado por "Foi" / "Foram" (voz passiva).',
-      formato: 'lista',
-    },
-    avancos: {
-      nome: 'Avanços da semana',
-      guia: 'O que avançou ou produziu algum resultado relevante. Itens iniciados por "Foi" / "Foram" quando forem ações concluídas.',
-      formato: 'lista',
-    },
-    atencao: {
-      nome: 'Pontos de atenção',
-      guia: 'Dificuldades, situações ou pendências que precisam da atenção da equipe PPE.',
-      formato: 'lista',
-    },
-    proximos: {
-      nome: 'Próximos passos',
-      guia: 'Atividades ou encaminhamentos da próxima semana. Use verbos no infinitivo (ex.: "Acompanhar...", "Participar...", "Aguardar...").',
-      formato: 'lista',
-    },
-    extras: {
-      nome: 'Extras',
-      guia: 'Outras informações relevantes da semana: percepções, oportunidades ou acontecimentos importantes.',
-      formato: 'prosa',
-    },
+    atividades: { nome: 'Principais atividades da semana (campo do formulário do Notion)', guia: 'Principais atividades realizadas durante a semana. Cada atividade vira um item iniciado por "Foi" / "Foram" (voz passiva).', formato: 'lista' },
+    resumo: { nome: 'Resumo da semana', guia: 'Em um ou dois parágrafos curtos, os principais fatos da semana: o que foi concluído, o que avançou e quais temas merecem atenção da gestão municipal e da coordenação do PPE. Deve permitir entender a semana sem ler o restante.', formato: 'prosa' },
+    pendres: { nome: 'Pendências resolvidas', guia: 'Qual era a pendência, desde quando vinha sendo acompanhada, como foi resolvida e quem conduziu a solução. Somente o que foi anotado.', formato: 'lista' },
+    atencao: { nome: 'Pontos de atenção', guia: 'O que ainda falta resolver, desde quando é acompanhado, quem é o responsável pelo próximo passo e se é necessário apoio do CIET/SEPLAN. Somente o que foi anotado.', formato: 'lista' },
+    comunicados: { nome: 'Comunicados, ofícios e convites recebidos', guia: 'Documentos recebidos de órgãos estaduais e parceiros e o encaminhamento dado pela gestão municipal: número do documento, órgão de origem, assunto, data, quem foi convocado, o que foi tratado e providências. Somente o que foi anotado.', formato: 'lista' },
+    anexo: { nome: 'Anexo I: legendas dos registros', guia: 'Fotos, prints e cópias de documentos citados, cada um com legenda curta (o que é, local e data), um por item.', formato: 'lista' },
   },
   territorial: {
     aconteceu: {
@@ -106,6 +82,36 @@ const CAMPOS = {
   },
 };
 
+// Blocos que se repetem no relatório periódico (dias, destaques, solicitações, agenda).
+const GRUPOS = {
+  dia: { titulo: 'Atividades desenvolvidas (por dia)', add: '+ Adicionar dia', cols: [
+    { k: 'data', nome: 'Dia', tipo: 'date' },
+    { k: 'txt', nome: 'Atividades do dia', ia: 1, formato: 'lista', guia: 'Atividades do dia, cada uma em um item: o que foi feito, com quem e qual foi o resultado. Itens iniciados por "Foi" / "Foram" (voz passiva).' }] },
+  dest: { titulo: 'Tema em destaque: Destaques da semana (opcional)', add: '+ Adicionar destaque', cols: [
+    { k: 'plano', nome: 'Plano de Ação (órgão — programa)', ia: 1, formato: 'frase', guia: 'Órgão e programa, no formato "SADA — CAF". Apenas corrija a grafia e use as siglas do glossário; não acrescente nada.' },
+    { k: 'situacao', nome: 'Situação relatada', ia: 1, formato: 'prosa', guia: 'O que foi feito e em que ponto está, com números quando houver.' },
+    { k: 'enc', nome: 'Encaminhamentos', ia: 1, formato: 'prosa', guia: 'Providências, responsáveis e prazos.' }] },
+  sol: { titulo: 'Tema em destaque: Solicitações e encaminhamentos (opcional)', add: '+ Adicionar solicitação', cols: [
+    { k: 'plano', nome: 'Plano de Ação (órgão — programa)', ia: 1, formato: 'frase', guia: 'Órgão e programa, no formato "SADA — CAF". Apenas corrija a grafia; não acrescente nada.' },
+    { k: 'pedido', nome: 'Solicitação', ia: 1, formato: 'prosa', guia: 'O que foi pedido e por quem.' },
+    { k: 'orgao', nome: 'Órgão responsável', ia: 1, formato: 'frase', guia: 'Nome do órgão que deve atender. Apenas corrija a grafia e use o nome por extenso do glossário quando existir.' },
+    { k: 'enc', nome: 'Encaminhamentos', ia: 1, formato: 'prosa', guia: 'O que já foi feito e o próximo passo.' }] },
+  ag: { titulo: 'Agenda e programação da próxima semana', add: '+ Adicionar ação', cols: [
+    { k: 'acao', nome: 'Ação', ia: 1, formato: 'frase', guia: 'Nome da ação prevista, em frase nominal curta.' },
+    { k: 'data', nome: 'Data', tipo: 'date' },
+    { k: 'hora', nome: 'Horário', tipo: 'time' },
+    { k: 'local', nome: 'Local e requisitos', ia: 1, formato: 'prosa', guia: 'Local da ação e, se anotados, público, documentos exigidos e demais requisitos para participar.' }] },
+};
+function guiaDe(tipo, k) {
+  if (CAMPOS[tipo] && CAMPOS[tipo][k]) return CAMPOS[tipo][k];
+  const m = /^(dia|dest|sol|ag)_\d{1,2}_([a-z]+)$/.exec(k);
+  if (tipo === 'semanal' && m) {
+    const c = GRUPOS[m[1]].cols.find((x) => x.k === m[2]);
+    if (c && c.ia) return { nome: GRUPOS[m[1]].titulo + ' — ' + c.nome, guia: c.guia, formato: c.formato };
+  }
+  return null;
+}
+
 const SISTEMA = `Você é redator técnico e revisor de relatórios do PPE (Pacto pela Economia), programa em que articuladores locais registram, em municípios do Piauí, suas atividades junto a prefeituras, secretarias, associações, sindicatos e órgãos estaduais e federais.
 
 Você recebe anotações informais do articulador, escritas com as próprias palavras dele, com erros de digitação, sem acentos, sem pontuação e sem maiúsculas. Sua tarefa NÃO é apenas corrigir o que ele escreveu: é REDIGIR o texto no padrão de um relatório institucional, formal, técnico e bem articulado, pronto para colar no Portal do Articulador, preservando integralmente os fatos.
@@ -129,6 +135,13 @@ REGRAS (em ordem de prioridade):
    - Assunto: uma frase nominal curta ("Reunião com a equipe técnica do CRAS sobre o programa X, no município Y").
    - Contexto: parágrafo em voz passiva ("Foi realizada uma reunião no ..., com ..., para tratar de ..."); quando houver assuntos enumerados, seguir com "Nesta reunião foram tratados os seguintes assuntos:" e uma lista com "- ".
    - Extras: parágrafo formal curto.
+   - Resumo da semana: um ou dois parágrafos curtos em voz passiva, com o que foi concluído, o que avançou e o que merece atenção, usando somente fatos das anotações.
+   - Atividades do dia: itens objetivos com "Foi/Foram": o que foi feito, com quem e qual foi o resultado.
+   - Plano de Ação e Órgão responsável: apenas "Órgão — programa" ou o nome do órgão, com grafia corrigida e siglas do glossário.
+   - Situação relatada, Solicitação e Encaminhamentos (tabelas): frases formais curtas, com números e prazos exatamente como anotados.
+   - Pendências resolvidas, Pontos de atenção e Comunicados: itens formais com o que foi anotado (qual era, desde quando, quem conduziu, o que falta, responsável pelo próximo passo, número e órgão do documento), sem completar o que não foi dito.
+   - Agenda: Ação em frase nominal; Local e requisitos em texto formal curto.
+   - Anexo I: uma legenda curta por registro (o que é, local e data), sem inventar o que não foi informado.
 10. FORMATO. Campos do tipo "lista": um item por linha, cada linha iniciada por "- ". Todos os itens terminam com ponto e vírgula (;), exceto o último, que termina com ponto final (.). Se houver somente um assunto, escreva em texto corrido, sem "- ", terminado com ponto final. Campos do tipo "prosa": texto corrido (e lista com "- " apenas para enumerar assuntos tratados). Campos do tipo "frase": uma única frase curta.
 11. Cada campo contém somente o que foi anotado para ele. Não mova informações entre campos nem repita informações entre campos. Se o campo já estiver formal e correto, melhore apenas o necessário.
 12. Os EXEMPLOS e as REFERÊNCIAS mostram o nível de reescrita e o estilo esperados. Imite o estilo, nunca reaproveite os fatos deles.
@@ -351,7 +364,8 @@ module.exports = async (req, res) => {
   if (!guias) return res.status(400).json({ erro: 'Tipo de registro inválido.' });
 
   const campos = {};
-  for (const k of Object.keys(guias)) {
+  for (const k of Object.keys(corpo.campos || {}).slice(0, 150)) {
+    if (!guiaDe(tipo, k)) continue;
     const v = limpar(corpo.campos && corpo.campos[k]);
     if (v) campos[k] = v.slice(0, 12000);
   }
@@ -364,7 +378,7 @@ module.exports = async (req, res) => {
   if (municipio) mensagem += `Município: ${municipio}\n`;
   mensagem += '\nReescreva cada campo abaixo seguindo as regras.\n';
   for (const k of chaves) {
-    const g = guias[k];
+    const g = guiaDe(tipo, k);
     mensagem += `\n=== Campo "${k}" — ${g.nome} ===\nOrientação do campo: ${g.guia}\nFormato: ${g.formato}\nAnotações do articulador:\n"""\n${campos[k]}\n"""\n`;
   }
 
