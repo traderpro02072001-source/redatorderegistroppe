@@ -91,6 +91,11 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 .dlg .acts{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
 .dlg .mini{font-size:13px;color:var(--mut);display:flex;gap:6px;align-items:center;margin-top:6px}
 #erroPre{max-height:48vh;overflow:auto;white-space:pre-wrap;word-break:break-word;background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:10px;font:12.5px/1.5 ui-monospace,Consolas,monospace;margin:0}
+.sep{font-size:22px;margin:40px 0 0;padding-top:18px;border-top:1px solid var(--line)}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:12px}
+.f2{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin:8px 0}
+.f2 input,.two input,.two select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
+.two{display:flex;gap:8px;flex-wrap:wrap}
 .foot{margin-top:40px;color:var(--fai);font-size:13px}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
@@ -119,7 +124,13 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
     <div class="prop"><span>Tipo</span><div class="ro" id="tipoTxt"></div><button class="btn sm" data-copy-prop="tipoTxt" type="button">Copiar</button></div>
   </div>
 
-  <div class="callout" id="avisos"><button class="x" id="avisosX" aria-label="Fechar" type="button">×</button><b>💡 Confira antes de copiar</b><ul id="avisosUl"></ul></div>
+  <div id="cabw"><div class="fname" style="margin-top:22px">Cabeçalho do documento (.docx)</div><div class="props" id="cab">
+  <div class="prop"><span>Período</span><div class="two"><input type="date" data-per="ini"><input type="date" data-per="fim"></div><span></span></div>
+  <div class="prop"><span>Articulador(a)</span><input type="text" data-per="art"><span></span></div>
+  <div class="prop"><span>Data de emissão</span><input type="date" data-per="emissao"><span></span></div>
+  <div class="prop"><span>Planilha do Plano de Ações</span><div class="two"><select data-per="plan"><option value="">Não se aplica (semana sem dia 1º/15)</option><option value="Sim">Sim, atualizada em:</option><option value="Não">Não atualizada</option></select><input type="date" data-per="plandata"></div><span></span></div>
+</div></div>
+<div class="callout" id="avisos"><button class="x" id="avisosX" aria-label="Fechar" type="button">×</button><b>💡 Confira antes de copiar</b><ul id="avisosUl"></ul></div>
 
   <div id="campos"></div>
 
@@ -131,6 +142,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
   <button class="btn" id="btnCopiarTudo" type="button">📋 Copiar tudo</button>
   <label><input type="checkbox" id="linha"> Copiar itens em linha única</label>
   <span class="spacer"></span>
+  <button class="btn" id="btnDocx" type="button">📄 Baixar relatório (.docx)</button>
   <button class="btn" id="btnChaves" type="button">⚙️ Chaves de API</button>
   <button class="btn" id="btnLimpar" type="button">🧹 Limpar</button>
 </div></div>
@@ -158,6 +170,7 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 (function(){
 'use strict';
@@ -170,36 +183,12 @@ const TITULOS = {
 // formato: "lista" = itens iniciados por "- ", um por linha | "prosa" = texto corrido | "frase" = frase curta
 const CAMPOS = {
   semanal: {
-    pendencias: {
-      nome: 'Pendências anteriores',
-      guia: 'Atividades, retornos ou encaminhamentos de semanas anteriores que ainda estão em aberto ou aguardando resolução.',
-      formato: 'lista',
-    },
-    atividades: {
-      nome: 'Principais atividades da semana',
-      guia: 'Principais atividades realizadas durante a semana. Cada atividade vira um item iniciado por "Foi" / "Foram" (voz passiva).',
-      formato: 'lista',
-    },
-    avancos: {
-      nome: 'Avanços da semana',
-      guia: 'O que avançou ou produziu algum resultado relevante. Itens iniciados por "Foi" / "Foram" quando forem ações concluídas.',
-      formato: 'lista',
-    },
-    atencao: {
-      nome: 'Pontos de atenção',
-      guia: 'Dificuldades, situações ou pendências que precisam da atenção da equipe PPE.',
-      formato: 'lista',
-    },
-    proximos: {
-      nome: 'Próximos passos',
-      guia: 'Atividades ou encaminhamentos da próxima semana. Use verbos no infinitivo (ex.: "Acompanhar...", "Participar...", "Aguardar...").',
-      formato: 'lista',
-    },
-    extras: {
-      nome: 'Extras',
-      guia: 'Outras informações relevantes da semana: percepções, oportunidades ou acontecimentos importantes.',
-      formato: 'prosa',
-    },
+    atividades: { nome: 'Principais atividades da semana (campo do formulário do Notion)', guia: 'Principais atividades realizadas durante a semana. Cada atividade vira um item iniciado por "Foi" / "Foram" (voz passiva).', formato: 'lista' },
+    resumo: { nome: 'Resumo da semana', guia: 'Em um ou dois parágrafos curtos, os principais fatos da semana: o que foi concluído, o que avançou e quais temas merecem atenção da gestão municipal e da coordenação do PPE. Deve permitir entender a semana sem ler o restante.', formato: 'prosa' },
+    pendres: { nome: 'Pendências resolvidas', guia: 'Qual era a pendência, desde quando vinha sendo acompanhada, como foi resolvida e quem conduziu a solução. Somente o que foi anotado.', formato: 'lista' },
+    atencao: { nome: 'Pontos de atenção', guia: 'O que ainda falta resolver, desde quando é acompanhado, quem é o responsável pelo próximo passo e se é necessário apoio do CIET/SEPLAN. Somente o que foi anotado.', formato: 'lista' },
+    comunicados: { nome: 'Comunicados, ofícios e convites recebidos', guia: 'Documentos recebidos de órgãos estaduais e parceiros e o encaminhamento dado pela gestão municipal: número do documento, órgão de origem, assunto, data, quem foi convocado, o que foi tratado e providências. Somente o que foi anotado.', formato: 'lista' },
+    anexo: { nome: 'Anexo I: legendas dos registros', guia: 'Fotos, prints e cópias de documentos citados, cada um com legenda curta (o que é, local e data), um por item.', formato: 'lista' },
   },
   territorial: {
     aconteceu: {
@@ -257,6 +246,36 @@ const CAMPOS = {
   },
 };
 
+// Blocos que se repetem no relatório periódico (dias, destaques, solicitações, agenda).
+const GRUPOS = {
+  dia: { titulo: 'Atividades desenvolvidas (por dia)', add: '+ Adicionar dia', cols: [
+    { k: 'data', nome: 'Dia', tipo: 'date' },
+    { k: 'txt', nome: 'Atividades do dia', ia: 1, formato: 'lista', guia: 'Atividades do dia, cada uma em um item: o que foi feito, com quem e qual foi o resultado. Itens iniciados por "Foi" / "Foram" (voz passiva).' }] },
+  dest: { titulo: 'Tema em destaque: Destaques da semana (opcional)', add: '+ Adicionar destaque', cols: [
+    { k: 'plano', nome: 'Plano de Ação (órgão — programa)', ia: 1, formato: 'frase', guia: 'Órgão e programa, no formato "SADA — CAF". Apenas corrija a grafia e use as siglas do glossário; não acrescente nada.' },
+    { k: 'situacao', nome: 'Situação relatada', ia: 1, formato: 'prosa', guia: 'O que foi feito e em que ponto está, com números quando houver.' },
+    { k: 'enc', nome: 'Encaminhamentos', ia: 1, formato: 'prosa', guia: 'Providências, responsáveis e prazos.' }] },
+  sol: { titulo: 'Tema em destaque: Solicitações e encaminhamentos (opcional)', add: '+ Adicionar solicitação', cols: [
+    { k: 'plano', nome: 'Plano de Ação (órgão — programa)', ia: 1, formato: 'frase', guia: 'Órgão e programa, no formato "SADA — CAF". Apenas corrija a grafia; não acrescente nada.' },
+    { k: 'pedido', nome: 'Solicitação', ia: 1, formato: 'prosa', guia: 'O que foi pedido e por quem.' },
+    { k: 'orgao', nome: 'Órgão responsável', ia: 1, formato: 'frase', guia: 'Nome do órgão que deve atender. Apenas corrija a grafia e use o nome por extenso do glossário quando existir.' },
+    { k: 'enc', nome: 'Encaminhamentos', ia: 1, formato: 'prosa', guia: 'O que já foi feito e o próximo passo.' }] },
+  ag: { titulo: 'Agenda e programação da próxima semana', add: '+ Adicionar ação', cols: [
+    { k: 'acao', nome: 'Ação', ia: 1, formato: 'frase', guia: 'Nome da ação prevista, em frase nominal curta.' },
+    { k: 'data', nome: 'Data', tipo: 'date' },
+    { k: 'hora', nome: 'Horário', tipo: 'time' },
+    { k: 'local', nome: 'Local e requisitos', ia: 1, formato: 'prosa', guia: 'Local da ação e, se anotados, público, documentos exigidos e demais requisitos para participar.' }] },
+};
+function guiaDe(tipo, k) {
+  if (CAMPOS[tipo] && CAMPOS[tipo][k]) return CAMPOS[tipo][k];
+  const m = /^(dia|dest|sol|ag)_\d{1,2}_([a-z]+)$/.exec(k);
+  if (tipo === 'semanal' && m) {
+    const c = GRUPOS[m[1]].cols.find((x) => x.k === m[2]);
+    if (c && c.ia) return { nome: GRUPOS[m[1]].titulo + ' — ' + c.nome, guia: c.guia, formato: c.formato };
+  }
+  return null;
+}
+
 const SISTEMA = `Você é redator técnico e revisor de relatórios do PPE (Pacto pela Economia), programa em que articuladores locais registram, em municípios do Piauí, suas atividades junto a prefeituras, secretarias, associações, sindicatos e órgãos estaduais e federais.
 
 Você recebe anotações informais do articulador, escritas com as próprias palavras dele, com erros de digitação, sem acentos, sem pontuação e sem maiúsculas. Sua tarefa NÃO é apenas corrigir o que ele escreveu: é REDIGIR o texto no padrão de um relatório institucional, formal, técnico e bem articulado, pronto para colar no Portal do Articulador, preservando integralmente os fatos.
@@ -280,6 +299,13 @@ REGRAS (em ordem de prioridade):
    - Assunto: uma frase nominal curta ("Reunião com a equipe técnica do CRAS sobre o programa X, no município Y").
    - Contexto: parágrafo em voz passiva ("Foi realizada uma reunião no ..., com ..., para tratar de ..."); quando houver assuntos enumerados, seguir com "Nesta reunião foram tratados os seguintes assuntos:" e uma lista com "- ".
    - Extras: parágrafo formal curto.
+   - Resumo da semana: um ou dois parágrafos curtos em voz passiva, com o que foi concluído, o que avançou e o que merece atenção, usando somente fatos das anotações.
+   - Atividades do dia: itens objetivos com "Foi/Foram": o que foi feito, com quem e qual foi o resultado.
+   - Plano de Ação e Órgão responsável: apenas "Órgão — programa" ou o nome do órgão, com grafia corrigida e siglas do glossário.
+   - Situação relatada, Solicitação e Encaminhamentos (tabelas): frases formais curtas, com números e prazos exatamente como anotados.
+   - Pendências resolvidas, Pontos de atenção e Comunicados: itens formais com o que foi anotado (qual era, desde quando, quem conduziu, o que falta, responsável pelo próximo passo, número e órgão do documento), sem completar o que não foi dito.
+   - Agenda: Ação em frase nominal; Local e requisitos em texto formal curto.
+   - Anexo I: uma legenda curta por registro (o que é, local e data), sem inventar o que não foi informado.
 10. FORMATO. Campos do tipo "lista": um item por linha, cada linha iniciada por "- ". Todos os itens terminam com ponto e vírgula (;), exceto o último, que termina com ponto final (.). Se houver somente um assunto, escreva em texto corrido, sem "- ", terminado com ponto final. Campos do tipo "prosa": texto corrido (e lista com "- " apenas para enumerar assuntos tratados). Campos do tipo "frase": uma única frase curta.
 11. Cada campo contém somente o que foi anotado para ele. Não mova informações entre campos nem repita informações entre campos. Se o campo já estiver formal e correto, melhore apenas o necessário.
 12. Os EXEMPLOS e as REFERÊNCIAS mostram o nível de reescrita e o estilo esperados. Imite o estilo, nunca reaproveite os fatos deles.
@@ -371,14 +397,18 @@ function montarSistema() {
 const MUNICIPIOS=['Betânia do Piauí','Buriti dos Montes','Campo Largo do Piauí','Cocal dos Alves','Coronel José Dias','Cristino Castro','Ipiranga do Piauí','Jerumenha','Monsenhor Gil','São José do Peixe','São José do Piauí','Tanque do Piauí'];
 
 const TIPOS={
-  semanal:{rotulo:'Relatório semanal',titulo:'Relatório Semanal',tipoPortal:'Relatório semanal',campos:[
-    {k:'pendencias',nome:'Pendências anteriores',dica:'Atividades, retornos ou encaminhamentos de semanas anteriores ainda em aberto.',ph:'ex: ainda aguardando a liberacao do cadastro no sei...'},
-    {k:'atividades',nome:'Principais atividades da semana',obr:1,dica:'Liste o que foi feito na semana.',ph:'ex: visita na secretaria de agricultura pra perguntar se tem arado...'},
-    {k:'avancos',nome:'Avanços da semana',dica:'O que avançou ou produziu algum resultado relevante?',ph:''},
-    {k:'atencao',nome:'Pontos de atenção',dica:'Dificuldades ou pendências que a equipe PPE precisa conhecer.',vazio:'Sem pontos de atenção.',ph:''},
-    {k:'proximos',nome:'Próximos passos',obr:1,dica:'O que fazer na próxima semana?',ph:''},
-    {k:'extras',nome:'Extras',dica:'Percepções, oportunidades ou acontecimentos importantes.',ph:''},
-    {k:'evidencias',nome:'Evidências | Materiais',semIA:1,dica:'Links do Drive. Copiado sem alterações.',ph:'https://drive.google.com/...'}]},
+  semanal:{rotulo:'Relatório periódico',titulo:'Relatório Semanal',tipoPortal:'Relatório semanal',campos:[
+    {k:'resumo',nome:'Resumo da semana',obr:1,dica:'Em um ou dois parágrafos: o que foi concluído, o que avançou e o que merece atenção.',ph:''},
+    {grupo:'dia'},{grupo:'dest'},{grupo:'sol'},
+    {k:'pendres',nome:'Pendências resolvidas',dica:'Qual era, desde quando era acompanhada, como foi resolvida e quem conduziu.',ph:''},
+    {k:'atencao',nome:'Pontos de atenção',dica:'O que falta resolver, desde quando, responsável pelo próximo passo e se precisa de apoio do CIET/SEPLAN.',ph:''},
+    {k:'comunicados',nome:'Comunicados, ofícios e convites recebidos',dica:'Opcional. Número, órgão de origem, assunto, data, quem foi convocado, o que foi tratado.',ph:''},
+    {grupo:'ag'},
+    {k:'anexo',nome:'Anexo I: legendas dos registros',dica:'Cada foto, print ou documento com legenda curta (o que é, local e data).',ph:''},
+    {k:'evidencias',nome:'Evidências | Materiais (link da pasta no Drive)',semIA:1,dica:'Também entra no Anexo I do documento.',ph:'https://drive.google.com/...'},
+    {sep:'Formulário do Notion'},
+    {k:'atividades',nome:'Principais atividades da semana',obr:1,dica:'Campo do formulário do Notion.',ph:''},
+    {k:'linkrel',nome:'Arquivo do relatório (link)',obr:1,semIA:1,dica:'Suba o .docx no Drive do município e cole o link aqui.',ph:'https://drive.google.com/...'}]},
   territorial:{rotulo:'Registro territorial',titulo:'Registro Territorial',tipoPortal:'Registro territorial',campos:[
     {k:'aconteceu',nome:'O que aconteceu?',obr:1,dica:'Descreva brevemente a atividade ou situação e seu objetivo.',ph:'ex: reuniao com o prefeito sobre o selo sim...'},
     {k:'envolvidos',nome:'Quem esteve envolvido?',dica:'Pessoas, grupos, instituições ou parceiros.',ph:'ex: prefeito fulano, secretario de agricultura...'},
@@ -399,6 +429,8 @@ const KEY='ppe-redator-v1';
 const hoje=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 let S={tipo:'semanal',data:hoje(),municipio:'São José do Piauí',inputs:{semanal:{},territorial:{},outro:{}},outputs:{semanal:{},territorial:{},outro:{}},linha:false,codigo:''};
 try{const sv=JSON.parse(localStorage.getItem(KEY)||'null');if(sv&&sv.inputs)S=Object.assign(S,sv)}catch(e){}
+S.per=Object.assign({ini:'',fim:'',emissao:hoje(),art:'Peter Moura Rodrigues',plan:'',plandata:''},S.per||{});
+const vz=()=>({dia:[],dest:[],sol:[],ag:[]});if(!S.grp||!S.grp.in)S.grp={in:vz(),out:vz()};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 
 const $=id=>document.getElementById(id);
@@ -438,6 +470,8 @@ function valorSaida(c){
 function renderCampos(){
   const t=TIPOS[S.tipo],box=$('campos');box.innerHTML='';
   t.campos.forEach(c=>{
+    if(c.sep){const d=document.createElement('h2');d.className='sep';d.textContent=c.sep;box.appendChild(d);return}
+    if(c.grupo){renderGrupo(c.grupo,box);return}
     const sec=document.createElement('section');sec.className='field';sec.dataset.k=c.k;
     const head=`<div class="fhead"><span class="fname">${c.nome}${c.obr?' <i>*</i>':''}</span><span class="fhint">${c.dica}</span></div>`;
     if(c.semIA){
@@ -454,11 +488,11 @@ function renderCampos(){
     [ti,to].forEach(x=>x&&grow(x));
   });
 }
-function renderTudo(){renderTipos();renderProps();renderCampos();$('linha').checked=!!S.linha;$('avisos').classList.remove('show')}
+function renderTudo(){renderTipos();renderProps();renderCampos();fillCab();$('linha').checked=!!S.linha;$('avisos').classList.remove('show')}
 
 /* ---------- eventos ---------- */
 $('campos').addEventListener('input',e=>{
-  const ta=e.target;if(ta.tagName!=='TEXTAREA')return;
+  const ta=e.target;if(ta.tagName!=='TEXTAREA')return;if(ta.closest('[data-g]'))return;
   const k=ta.closest('.field').dataset.k;grow(ta);
   if(ta.hasAttribute('data-in'))S.inputs[S.tipo][k]=ta.value;else S.outputs[S.tipo][k]=ta.value;
   save();
@@ -488,7 +522,7 @@ $('btnCopiarTudo').onclick=()=>{
   const t=TIPOS[S.tipo];
   const partes=[`${t.titulo} / ${S.municipio}`,`Data: ${brDate(S.data)}`,`Município: ${S.municipio}`,`Tipo: ${t.tipoPortal}`];
   t.campos.forEach(c=>{
-    let v=(c.semIA?(S.inputs[S.tipo][c.k]||''):(S.outputs[S.tipo][c.k]||'')).trim();
+    if(!c.k)return;let v=(c.semIA?(S.inputs[S.tipo][c.k]||''):(S.outputs[S.tipo][c.k]||'')).trim();
     if(!v&&c.vazio)v=c.vazio;
     if(v)partes.push('\n'+c.nome.toUpperCase()+'\n'+comLinha(v));
   });
@@ -508,7 +542,7 @@ async function reescrever(keys,tentou){
   if(ocupado)return;
   const t=TIPOS[S.tipo];
   const campos={};
-  keys.forEach(k=>{const v=(S.inputs[S.tipo][k]||'').trim();if(v)campos[k]=v});
+  keys.forEach(k=>{const v=getIn(k).trim();if(v)campos[k]=v});
   if(!Object.keys(campos).length){toast('Escreva suas anotações primeiro.');return}
   ocupado=true;marcar(keys,true);
   const btn=$('btnTudo'),antes=btn.innerHTML;btn.disabled=true;btn.innerHTML='<span class="spin"></span> Reescrevendo…';
@@ -522,8 +556,8 @@ async function reescrever(keys,tentou){
       return;
     }
     keys.forEach(k=>{
-      const c=t.campos.find(x=>x.k===k);if(c.semIA)return;
-      S.outputs[S.tipo][k]=(d.campos&&d.campos[k])||'';
+      if(!GK.test(k)){const c=t.campos.find(x=>x.k===k);if(c&&c.semIA)return}
+      setOut(k,(d.campos&&d.campos[k])||'');
     });
     save();renderCampos();
     const av=d.avisos||[];
@@ -537,7 +571,7 @@ async function reescrever(keys,tentou){
     if(ocupado){ocupado=false;marcar(keys,false);btn.disabled=false;btn.innerHTML=antes}
   }
 }
-$('btnTudo').onclick=()=>reescrever(TIPOS[S.tipo].campos.filter(c=>!c.semIA).map(c=>c.k));
+$('btnTudo').onclick=()=>{let ks=TIPOS[S.tipo].campos.filter(c=>c.k&&!c.semIA).map(c=>c.k);if(S.tipo==='semanal')Object.keys(GRUPOS).forEach(id=>S.grp.in[id].forEach((r,i)=>{ks=ks.concat(rowKeys(id,i))}));reescrever(ks)};
 
 /* ---------- importar planilha ---------- */
 const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[*?]/g,'').replace(/\s+/g,' ').trim().toUpperCase();
@@ -664,10 +698,10 @@ function escolherModelo(provedor, ids) {
 
 class ErroTec extends Error{constructor(m,t){super(m);this.name='ErroTec';this.tent=t||[]}}
 function montarMsg(tipo,municipio,campos){
-  const g=CAMPOS[tipo];let m='Tipo de registro: '+TITULOS[tipo]+'\n';
+  let m='Tipo de registro: '+TITULOS[tipo]+'\n';
   if(municipio)m+='Município: '+municipio+'\n';
   m+='\nReescreva cada campo abaixo seguindo as regras.\n';
-  Object.keys(campos).forEach(k=>{m+='\n=== Campo "'+k+'" — '+g[k].nome+' ===\nOrientação do campo: '+g[k].guia+'\nFormato: '+g[k].formato+'\nAnotações do articulador:\n"""\n'+campos[k]+'\n"""\n'});
+  Object.keys(campos).forEach(k=>{m+='\n=== Campo "'+k+'" — '+guiaDe(tipo,k).nome+' ===\nOrientação do campo: '+guiaDe(tipo,k).guia+'\nFormato: '+guiaDe(tipo,k).formato+'\nAnotações do articulador:\n"""\n'+campos[k]+'\n"""\n'});
   return m;
 }
 function lerJson(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)return null;try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}}
@@ -778,6 +812,124 @@ $('erroFechar').onclick=()=>$('dlgErro').close();
 $('erroCopiar').onclick=()=>copiar($('erroPre').textContent);
 window.addEventListener('error',ev=>falha(ev.error||new Error(ev.message),'Erro inesperado na página ('+(ev.filename||'')+':'+(ev.lineno||'')+')'));
 window.addEventListener('unhandledrejection',ev=>falha(ev.reason instanceof Error?ev.reason:new Error(String(ev.reason)),'Promessa rejeitada sem tratamento'));
+
+
+/* ---------- relatório periódico: blocos repetidos ---------- */
+const GK=/^(dia|dest|sol|ag)_(\d+)_([a-z]+)$/;
+function getIn(k){const m=GK.exec(k);return m?((S.grp.in[m[1]][m[2]]||{})[m[3]]||''):(S.inputs[S.tipo][k]||'')}
+function setOut(k,v){const m=GK.exec(k);if(m){(S.grp.out[m[1]][m[2]]=S.grp.out[m[1]][m[2]]||{})[m[3]]=v}else S.outputs[S.tipo][k]=v}
+function rowKeys(id,i){return GRUPOS[id].cols.filter(c=>c.ia).map(c=>id+'_'+i+'_'+c.k)}
+function renderGrupo(id,box){
+  const g=GRUPOS[id],sec=document.createElement('section');sec.className='field';sec.dataset.g=id;
+  sec.innerHTML='<div class="fhead"><span class="fname">'+g.titulo+'</span></div><div class="rows"></div><button class="btn" style="margin-top:10px" data-ga="add" type="button">'+g.add+'</button>';
+  const rows=sec.querySelector('.rows');
+  S.grp.in[id].forEach((r,i)=>{
+    const card=document.createElement('div');card.className='card';card.dataset.i=i;
+    let h='<div class="clabel">#'+(i+1)+'<span class="spacer"></span><button class="btn sm" data-ga="redo" type="button">↻ Refazer</button><button class="btn sm" data-ga="del" type="button">Remover</button></div>';
+    g.cols.forEach(c=>{
+      if(c.tipo)h+='<label class="f2">'+c.nome+'<input type="'+c.tipo+'" data-gk="'+c.k+'"></label>';
+      else h+='<div class="cols" style="margin-top:6px"><div class="col"><div class="clabel">✍️ '+c.nome+'</div><textarea data-gk="'+c.k+'"></textarea></div><div class="col"><div class="clabel">✅ Texto formal<span class="spacer"></span><button class="btn sm" data-ga="copy" data-k="'+c.k+'" type="button">Copiar</button></div><textarea class="out" data-gk="'+c.k+'" data-out></textarea></div></div>';
+    });
+    card.innerHTML=h;
+    card.querySelectorAll('[data-gk]').forEach(el=>{const k=el.dataset.gk;el.value=el.hasAttribute('data-out')?((S.grp.out[id][i]||{})[k]||''):((r||{})[k]||'')});
+    rows.appendChild(card);
+  });
+  box.appendChild(sec);sec.querySelectorAll('textarea').forEach(grow);
+}
+$('campos').addEventListener('input',e=>{
+  const el=e.target,sec=el.closest('[data-g]');if(!sec||!el.dataset.gk)return;
+  const id=sec.dataset.g,i=+el.closest('.card').dataset.i,k=el.dataset.gk,alvo=el.hasAttribute('data-out')?S.grp.out[id]:S.grp.in[id];
+  (alvo[i]=alvo[i]||{})[k]=el.value;if(el.tagName==='TEXTAREA')grow(el);save();
+});
+$('campos').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ga]');if(!b)return;
+  const sec=b.closest('[data-g]'),id=sec.dataset.g,card=b.closest('.card'),i=card?+card.dataset.i:-1,a=b.dataset.ga;
+  if(a==='add'){if(S.grp.in[id].length>=30)return toast('Limite de 30 linhas.');S.grp.in[id].push({});S.grp.out[id].push({});save();renderCampos()}
+  else if(a==='del'){if(!confirm('Remover esta linha?'))return;S.grp.in[id].splice(i,1);S.grp.out[id].splice(i,1);save();renderCampos()}
+  else if(a==='redo')reescrever(rowKeys(id,i));
+  else if(a==='copy'){const v=((S.grp.out[id][i]||{})[b.dataset.k]||'').trim();v?copiar(comLinha(v)):toast('Nada para copiar ainda.')}
+});
+function fillCab(){
+  $('cabw').style.display=S.tipo==='semanal'?'':'none';$('btnDocx').style.display=S.tipo==='semanal'?'':'none';
+  document.querySelectorAll('[data-per]').forEach(el=>{el.value=S.per[el.dataset.per]||''});
+}
+document.querySelectorAll('[data-per]').forEach(el=>{el.addEventListener('input',()=>{S.per[el.dataset.per]=el.value;save()})});
+
+/* docx:ini */
+const MES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'],DIA=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+const pd=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');return m?new Date(+m[1],+m[2]-1,+m[3]):null};
+const br=iso=>{const d=pd(iso);return d?String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear():''};
+const dd=d=>String(d.getDate()).padStart(2,'0');
+function periodoTxt(a,b){const x=pd(a),y=pd(b);if(!x||!y)return '';
+  if(x.getMonth()===y.getMonth()&&x.getFullYear()===y.getFullYear())return dd(x)+' a '+dd(y)+' de '+MES[y.getMonth()]+' de '+y.getFullYear();
+  return dd(x)+' de '+MES[x.getMonth()]+(x.getFullYear()!==y.getFullYear()?' de '+x.getFullYear():'')+' a '+dd(y)+' de '+MES[y.getMonth()]+' de '+y.getFullYear()}
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const rn=(t,o)=>{o=o||{};return '<w:r><w:rPr>'+(o.b?'<w:b/>':'')+(o.i?'<w:i/>':'')+(o.c?'<w:color w:val="'+o.c+'"/>':'')+'<w:sz w:val="'+(o.sz||21)+'"/></w:rPr><w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>'};
+const PP=(x,o)=>{o=o||{};return '<w:p><w:pPr>'+(o.st?'<w:pStyle w:val="'+o.st+'"/><w:keepNext/>':'')+'<w:spacing w:before="'+(o.bf||0)+'" w:after="'+(o.af==null?100:o.af)+'" w:line="276" w:lineRule="auto"/>'+(o.ind?'<w:ind w:left="'+o.ind+'" w:hanging="'+o.hang+'"/>':'')+(o.jc?'<w:jc w:val="'+o.jc+'"/>':'')+'</w:pPr>'+x+'</w:p>'};
+const HH=(n,t)=>PP(rn(t,{b:1,c:'4f7cac',sz:n===1?26:n===2?24:22}),{st:'Heading'+n,bf:n===1?0:n===2?240:140,af:80});
+function blocos(txt,o){o=o||{};return String(txt).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(l=>{
+  const m=/^[-•]\s+(.*)$/.exec(l);
+  return m?PP(rn('•',o)+'<w:r><w:tab/></w:r>'+rn(m[1],o),{ind:400,hang:260,jc:o.jc||'both',af:60}):PP(rn(l,o),{jc:o.jc||'both',af:o.af==null?100:o.af})}).join('')||PP('',{af:0})}
+const TC=(w,x,f,o)=>'<w:tc><w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/>'+(f?'<w:shd w:val="clear" w:color="auto" w:fill="'+f+'"/>':'')+'<w:tcMar><w:top w:w="70" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="70" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>'+blocos(x,Object.assign({sz:20,jc:'left',af:40},o||{}))+'</w:tc>';
+function TB(ws,head,rows,labelCol){
+  const bd=['top','left','bottom','right','insideH','insideV'].map(s=>'<w:'+s+' w:val="single" w:sz="4" w:space="0" w:color="9DB7D5"/>').join('');
+  let x='<w:tbl><w:tblPr><w:tblW w:w="'+ws.reduce((a,b)=>a+b,0)+'" w:type="dxa"/><w:tblBorders>'+bd+'</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>'+ws.map(w=>'<w:gridCol w:w="'+w+'"/>').join('')+'</w:tblGrid>';
+  if(head)x+='<w:tr><w:trPr><w:tblHeader/></w:trPr>'+head.map((t,i)=>TC(ws[i],t,'4f7cac',{b:1,c:'ffffff'})).join('')+'</w:tr>';
+  rows.forEach(r=>{x+='<w:tr><w:trPr><w:cantSplit/></w:trPr>'+r.map((t,i)=>TC(ws[i],t,labelCol&&i===0?'eaf0f7':'',labelCol&&i===0?{b:1}:{})).join('')+'</w:tr>'});
+  return x+'</w:tbl>'+PP('',{af:100})}
+function montarCorpo(D){
+  const per=periodoTxt(D.ini,D.fim),SEM='Sem registros no período.';let x='';
+  x+=HH(1,'RELATÓRIO PERIÓDICO DE ATIVIDADES DO ARTICULADOR MUNICIPAL');
+  x+=PP(rn('A ser anexado ao relatório no Notion',{i:1,c:'595959',sz:20}),{af:60});
+  x+=PP(rn(D.mun+' (PI)'+(per?' · '+per:''),{b:1,c:'595959',sz:21}),{af:160});
+  const info=[['Período',per],['Município',D.mun+' — PI'],['Articulador(a) municipal',D.art],['Data de emissão',br(D.emissao)]];
+  if(D.plan)info.push(['Planilha de Atualização do Plano de Ações (semanas do dia 1º e do dia 15)',D.plan+(D.plandata?' — atualizada no Drive do PPE em '+br(D.plandata):'')]);
+  x+=TB([3000,6643],null,info,1);
+  x+=HH(2,'Resumo da semana')+blocos(D.resumo||SEM);
+  x+=HH(2,'Atividades desenvolvidas');
+  const dias=D.dias.filter(r=>r.txt).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(!dias.length)x+=blocos(SEM);
+  dias.forEach(r=>{const d=pd(r.data);x+=HH(3,d?DIA[d.getDay()].replace(/^./,c=>c.toUpperCase())+', '+dd(d)+'/'+String(d.getMonth()+1).padStart(2,'0'):'[Dia]')+blocos(r.txt)});
+  const dest=D.dest.filter(r=>r.plano||r.situacao||r.enc),sol=D.sol.filter(r=>r.plano||r.pedido||r.orgao||r.enc);
+  if(dest.length||sol.length){
+    x+=HH(2,'Tema em destaque da semana');
+    if(dest.length)x+=HH(3,'Destaques da Semana')+TB([2300,4100,3243],['Plano de Ação','Situação relatada','Encaminhamentos'],dest.map(r=>[r.plano,r.situacao,r.enc]));
+    if(sol.length)x+=HH(3,'Solicitações e Encaminhamentos')+TB([1900,2900,1700,3143],['Plano de Ação','Solicitação','Órgão responsável','Encaminhamentos'],sol.map(r=>[r.plano,r.pedido,r.orgao,r.enc]));
+  }
+  x+=HH(2,'Pendências resolvidas e pontos de atenção')+HH(3,'Pendências resolvidas')+blocos(D.pendres||SEM)+HH(3,'Pontos de atenção')+blocos(D.atencao||SEM);
+  if(D.comunicados)x+=HH(2,'Comunicados, ofícios e convites recebidos')+blocos(D.comunicados);
+  x+=HH(2,'Agenda e programação da próxima semana');
+  const ag=D.ag.filter(r=>r.acao||r.local||r.data);
+  x+=ag.length?TB([2900,2000,4743],['Ação','Data / horário','Local e requisitos'],ag.map(r=>[r.acao,(br(r.data)+(r.hora?', '+r.hora.replace(':','h'):'')).trim(),r.local])):blocos(SEM);
+  x+=HH(2,'Anexo I — Registros da semana');
+  x+=PP(rn('Link da pasta de evidências no Drive do PPE: ',{b:1})+rn(D.link||'[colar link]'),{af:100});
+  if(D.anexo)x+=blocos(D.anexo);
+  return x;
+}
+/* docx:fim */
+function coletarDoc(){
+  const o=S.outputs.semanal,i=S.inputs.semanal,v=k=>String(o[k]||i[k]||'').trim();
+  const L=id=>S.grp.in[id].map((r,n)=>{const q={},u=S.grp.out[id][n]||{};GRUPOS[id].cols.forEach(c=>{q[c.k]=String(c.ia?(u[c.k]||(r||{})[c.k]||''):((r||{})[c.k]||'')).trim()});return q});
+  const P=S.per;
+  return {mun:S.municipio,ini:P.ini,fim:P.fim,art:P.art,emissao:P.emissao,plan:P.plan,plandata:P.plandata,resumo:v('resumo'),pendres:v('pendres'),atencao:v('atencao'),comunicados:v('comunicados'),anexo:v('anexo'),link:String(i.evidencias||'').trim(),dias:L('dia'),dest:L('dest'),sol:L('sol'),ag:L('ag')};
+}
+$('btnDocx').onclick=async()=>{
+  const tent=[];
+  try{
+    if(!window.JSZip)throw new Error('Biblioteca JSZip não carregou (sem internet ou bloqueio do CDN).');
+    const D=coletarDoc();if(!D.ini||!D.fim){toast('Informe o período no cabeçalho do documento.');return}
+    const r=await fetch('/modelo.docx');tent.push({etapa:'Modelo do relatório',url:new URL('/modelo.docx',location.href).href,status:r.status+' '+r.statusText});
+    if(!r.ok)throw new Error('Não foi possível carregar o modelo.docx (HTTP '+r.status+'). Ele precisa estar na raiz do projeto publicado.');
+    const zip=await JSZip.loadAsync(await r.arrayBuffer());
+    let xml=await zip.file('word/document.xml').async('string');
+    const a=xml.indexOf('<w:body>')+8,b=xml.lastIndexOf('<w:sectPr');
+    zip.file('word/document.xml',xml.slice(0,a)+montarCorpo(D)+xml.slice(b));
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+    const nome=(D.emissao||'').replace(/-/g,'')+'_PPE_Relatorio_Semanal_'+D.art.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,'_')+'.docx';
+    const u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download=nome;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
+    toast('Documento gerado: '+nome);
+  }catch(e){e.tent=tent;falha(e,'Gerar relatório .docx')}
+};
 
 /* ---------- início ---------- */
 const sel=$('municipio');
