@@ -96,6 +96,9 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 .f2{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--mut);margin:8px 0}
 .f2 input,.two input,.two select{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 8px}
 .two{display:flex;gap:8px;flex-wrap:wrap}
+.nform{max-width:640px;margin-top:14px}.nt{font-size:20px;font-weight:700;margin:22px 0 4px}.nt span{color:var(--fai);font-weight:400}
+.nd{color:var(--mut);font-size:14px;margin-bottom:8px}.nbox{border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-height:44px;white-space:pre-wrap;font-size:15px;margin-bottom:6px}.nbox i{color:var(--fai)}
+.nradio div{padding:3px 0;font-size:15px}.nradio .on{font-weight:600}.regi{display:flex;gap:10px;align-items:center}
 .foot{margin-top:40px;color:var(--fai);font-size:13px}
 .spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
@@ -108,13 +111,15 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
   <h1>Redator PPE</h1>
   <p class="sub">Escreva suas anotações do seu jeito. O sistema devolve o texto formal, pronto para copiar para o Portal do Articulador.</p>
 
+  <div class="row" style="margin-bottom:16px"><button class="chip" data-aba="ed" aria-pressed="true" type="button">✏️ Editor</button><button class="chip" data-aba="reg" aria-pressed="false" type="button">📚 Registros salvos (<span id="nReg">0</span>)</button><span class="spacer"></span><button class="btn pri" id="btnNovo" type="button">+ Novo registro</button></div>
+  <div id="vEd">
   <div class="row" id="tipos" role="group" aria-label="Tipo de registro"></div>
 
   <div class="drop" id="drop">
     <span>📂 Tem uma planilha de rascunho?</span>
-    <button class="btn" id="btnImport" type="button">Importar .xlsx</button>
+    <button class="btn" id="btnImport" type="button">Importar .xlsx / .docx</button>
     <span style="font-size:13px">ou arraste o arquivo para cá</span>
-    <input type="file" id="file" accept=".xlsx,.xlsm" hidden>
+    <input type="file" id="file" accept=".xlsx,.xlsm,.docx" hidden>
   </div>
 
   <div class="props">
@@ -134,10 +139,11 @@ dialog::backdrop{background:rgba(0,0,0,.4)}
 
   <div id="campos"></div>
 
+  <div id="notion"></div>
   <p class="foot">Dica: o texto formal é editável. Ajuste o que quiser antes de copiar. Revise sempre os nomes, números e datas.</p>
-</main>
+</div><div id="vReg" style="display:none"></div></main>
 
-<div class="bar"><div class="in">
+<div class="bar" id="bar"><div class="in">
   <button class="btn pri" id="btnTudo" type="button">✨ Reescrever tudo</button>
   <button class="btn" id="btnCopiarTudo" type="button">📋 Copiar tudo</button>
   <label><input type="checkbox" id="linha"> Copiar itens em linha única</label>
@@ -266,6 +272,17 @@ const GRUPOS = {
     { k: 'hora', nome: 'Horário', tipo: 'time' },
     { k: 'local', nome: 'Local e requisitos', ia: 1, formato: 'prosa', guia: 'Local da ação e, se anotados, público, documentos exigidos e demais requisitos para participar.' }] },
 };
+// Geração automática do Resumo e das Principais atividades (Notion) a partir das atividades do dia.
+function prefacioDerivar(dv) {
+  const instr = dv.campo === 'resumo'
+    ? 'Redija o RESUMO DA SEMANA em um ou dois parágrafos curtos (prosa, sem tópicos), apresentando os principais fatos da semana: o que foi concluído, o que avançou e quais temas merecem atenção da gestão municipal e da coordenação do PPE. O resumo deve permitir entender a semana sem ler o restante do relatório.'
+    : 'Redija o campo PRINCIPAIS ATIVIDADES DA SEMANA (formulário do Notion) em tópicos, um por linha, iniciados por "- " e com "Foi/Foram" (voz passiva), selecionando e consolidando as principais atividades (em geral de 4 a 8 itens). Não é um resumo corrido: são tópicos objetivos.';
+  return {
+    antes: 'ATENÇÃO: neste pedido o texto do campo NÃO é um rascunho a corrigir. É o conjunto das atividades e registros da semana, já em tom formal. ' + instr + ' Use somente fatos presentes no conjunto, sem acrescentar nada.\\n\\n',
+    depois: dv.evitar ? '\\nTexto já usado em outro campo do mesmo relatório (NÃO repita as mesmas frases nem a mesma estrutura; traga outro recorte e outra redação):\\n"""\\n' + dv.evitar + '\\n"""\\n' : '',
+  };
+}
+
 function guiaDe(tipo, k) {
   if (CAMPOS[tipo] && CAMPOS[tipo][k]) return CAMPOS[tipo][k];
   const m = /^(dia|dest|sol|ag)_\d{1,2}_([a-z]+)$/.exec(k);
@@ -431,7 +448,8 @@ let S={tipo:'semanal',data:hoje(),municipio:'São José do Piauí',inputs:{seman
 try{const sv=JSON.parse(localStorage.getItem(KEY)||'null');if(sv&&sv.inputs)S=Object.assign(S,sv)}catch(e){}
 S.per=Object.assign({ini:'',fim:'',emissao:hoje(),art:'Peter Moura Rodrigues',plan:'',plandata:''},S.per||{});
 const vz=()=>({dia:[],dest:[],sol:[],ag:[]});if(!S.grp||!S.grp.in)S.grp={in:vz(),out:vz()};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+if(!S.rid)S.rid=Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{upsert();renderNotion()}catch(e){}};
 
 const $=id=>document.getElementById(id);
 const toastEl=$('toast');let tt;
@@ -479,7 +497,7 @@ function renderCampos(){
     }else{
       sec.innerHTML=head+`<div class="cols">
         <div class="col"><div class="clabel">✍️ Suas anotações</div><textarea data-in placeholder="${c.ph||'Escreva do seu jeito, pode errar à vontade.'}"></textarea></div>
-        <div class="col"><div class="clabel">✅ Texto formal<span class="spacer"></span><button class="btn sm" data-act="redo" type="button">↻ Refazer</button><button class="btn sm" data-act="copy" type="button">Copiar</button></div><textarea class="out" data-out placeholder="${c.vazio?'Se ficar vazio, será usado: '+c.vazio:'O texto formal aparece aqui.'}"></textarea></div>
+        <div class="col"><div class="clabel">✅ Texto formal<span class="spacer"></span>${S.tipo==='semanal'&&(c.k==='resumo'||c.k==='atividades')?'<button class="btn sm" data-act="derive" type="button">✨ Gerar das atividades</button>':''}<button class="btn sm" data-act="redo" type="button">↻ Refazer</button><button class="btn sm" data-act="copy" type="button">Copiar</button></div><textarea class="out" data-out placeholder="${c.vazio?'Se ficar vazio, será usado: '+c.vazio:'O texto formal aparece aqui.'}"></textarea></div>
       </div>`;
     }
     box.appendChild(sec);
@@ -500,7 +518,7 @@ $('campos').addEventListener('input',e=>{
 $('campos').addEventListener('click',e=>{
   const b=e.target.closest('button[data-act]');if(!b)return;
   const sec=b.closest('.field'),k=sec.dataset.k,c=TIPOS[S.tipo].campos.find(x=>x.k===k);
-  if(b.dataset.act==='redo')reescrever([k]);
+  if(b.dataset.act==='derive')derivar(k);else if(b.dataset.act==='redo')reescrever([k]);
   else{
     const ta=sec.querySelector(c.semIA?'[data-in]':'[data-out]');
     let v=ta.value.trim();if(!v&&c.vazio)v=c.vazio;
@@ -571,7 +589,7 @@ async function reescrever(keys,tentou){
     if(ocupado){ocupado=false;marcar(keys,false);btn.disabled=false;btn.innerHTML=antes}
   }
 }
-$('btnTudo').onclick=()=>{let ks=TIPOS[S.tipo].campos.filter(c=>c.k&&!c.semIA).map(c=>c.k);if(S.tipo==='semanal')Object.keys(GRUPOS).forEach(id=>S.grp.in[id].forEach((r,i)=>{ks=ks.concat(rowKeys(id,i))}));reescrever(ks)};
+$('btnTudo').onclick=async()=>{let ks=TIPOS[S.tipo].campos.filter(c=>c.k&&!c.semIA).map(c=>c.k);if(S.tipo==='semanal')Object.keys(GRUPOS).forEach(id=>S.grp.in[id].forEach((r,i)=>{ks=ks.concat(rowKeys(id,i))}));await reescrever(ks);if(S.tipo==='semanal'){if(!(S.inputs.semanal.resumo||'').trim())await derivar('resumo',1);if(!(S.inputs.semanal.atividades||'').trim())await derivar('atividades',1)}};
 
 /* ---------- importar planilha ---------- */
 const norm=s=>String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[*?]/g,'').replace(/\s+/g,' ').trim().toUpperCase();
@@ -591,6 +609,7 @@ function textoParaISO(s){
   return i>=0?m[3]+'-'+String(i+1).padStart(2,'0')+'-'+m[1].padStart(2,'0'):'';
 }
 function importar(buf){
+  if(temConteudo())novoRegistro();
   if(!window.XLSX){toast('Biblioteca de planilhas não carregou. Verifique a internet.');return}
   let wb;try{wb=XLSX.read(buf,{type:'array'})}catch(e){toast('Não consegui abrir esse arquivo.');return}
   const nome=wb.SheetNames.find(n=>/rascunho/i.test(n))||wb.SheetNames[0];
@@ -628,11 +647,11 @@ function importar(buf){
 }
 const fileIn=$('file');
 $('btnImport').onclick=()=>fileIn.click();
-fileIn.onchange=()=>{const f=fileIn.files[0];if(f)f.arrayBuffer().then(importar);fileIn.value=''};
+fileIn.onchange=()=>{const f=fileIn.files[0];if(f)importarArq(f);fileIn.value=''};
 const drop=$('drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
-drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)f.arrayBuffer().then(importar)});
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)importarArq(f)});
 
 /* ---------- chaves de API ---------- */
 const PROV={groq:'Groq',gemini:'Gemini',anthropic:'Claude'};
@@ -697,11 +716,12 @@ function escolherModelo(provedor, ids) {
 }
 
 class ErroTec extends Error{constructor(m,t){super(m);this.name='ErroTec';this.tent=t||[]}}
-function montarMsg(tipo,municipio,campos){
+function montarMsg(tipo,municipio,campos,dv){
   let m='Tipo de registro: '+TITULOS[tipo]+'\n';
   if(municipio)m+='Município: '+municipio+'\n';
   m+='\nReescreva cada campo abaixo seguindo as regras.\n';
   Object.keys(campos).forEach(k=>{m+='\n=== Campo "'+k+'" — '+guiaDe(tipo,k).nome+' ===\nOrientação do campo: '+guiaDe(tipo,k).guia+'\nFormato: '+guiaDe(tipo,k).formato+'\nAnotações do articulador:\n"""\n'+campos[k]+'\n"""\n'});
+  if(dv){const p=prefacioDerivar(dv);m=p.antes+m+p.depois}
   return m;
 }
 function lerJson(t){t=String(t||'').replace(/```json|```/g,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)return null;try{return JSON.parse(t.slice(a,b+1))}catch(e){return null}}
@@ -747,14 +767,14 @@ async function direto(item,sis,msg,tent){
     return{campos:obj.campos,avisos:Array.isArray(obj.avisos)?obj.avisos.slice(0,6):[],motor:item.nome+' ('+reg.modelo+', direto)'};
   }catch(e){reg.erro=e.name+': '+e.message;if(e.st)reg.status=e.st;if(e.corpo)reg.corpo=e.corpo;tent.push(reg);return null}
 }
-async function chamarReescrita(campos){
+async function chamarReescrita(campos,dv){
   const tent=[],chaves=chavesAtivas();
-  const s=await tentarServidor({tipo:S.tipo,municipio:S.municipio,campos,chaves},tent);
+  const s=await tentarServidor({tipo:S.tipo,municipio:S.municipio,campos,chaves,derivar:dv},tent);
   if(s.acesso)return{acesso:true};
   if(s.d)return s.d;
   if(!s.indisponivel)throw new ErroTec('O servidor respondeu com erro',tent);
   if(!chaves.length){tent.push({etapa:'Modo direto',erro:'Nenhuma chave ativa em ⚙️ Chaves de API; sem servidor não há como reescrever.'});throw new ErroTec('Servidor indisponível e nenhuma chave cadastrada',tent)}
-  const sis=montarSistema(),msg=montarMsg(S.tipo,S.municipio,campos);
+  const sis=montarSistema(),msg=montarMsg(S.tipo,S.municipio,campos,dv);
   for(const item of chaves){
     const r=await direto(item,sis,msg,tent);
     if(r){const o={};Object.keys(campos).forEach(k=>{o[k]=String(r.campos[k]||'').trim()});r.campos=o;return r}
@@ -864,46 +884,45 @@ function periodoTxt(a,b){const x=pd(a),y=pd(b);if(!x||!y)return '';
   if(x.getMonth()===y.getMonth()&&x.getFullYear()===y.getFullYear())return dd(x)+' a '+dd(y)+' de '+MES[y.getMonth()]+' de '+y.getFullYear();
   return dd(x)+' de '+MES[x.getMonth()]+(x.getFullYear()!==y.getFullYear()?' de '+x.getFullYear():'')+' a '+dd(y)+' de '+MES[y.getMonth()]+' de '+y.getFullYear()}
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const rn=(t,o)=>{o=o||{};return '<w:r><w:rPr>'+(o.b?'<w:b/>':'')+(o.i?'<w:i/>':'')+(o.c?'<w:color w:val="'+o.c+'"/>':'')+'<w:sz w:val="'+(o.sz||21)+'"/></w:rPr><w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>'};
-const PP=(x,o)=>{o=o||{};return '<w:p><w:pPr>'+(o.st?'<w:pStyle w:val="'+o.st+'"/><w:keepNext/>':'')+'<w:spacing w:before="'+(o.bf||0)+'" w:after="'+(o.af==null?100:o.af)+'" w:line="276" w:lineRule="auto"/>'+(o.ind?'<w:ind w:left="'+o.ind+'" w:hanging="'+o.hang+'"/>':'')+(o.jc?'<w:jc w:val="'+o.jc+'"/>':'')+'</w:pPr>'+x+'</w:p>'};
-const HH=(n,t)=>PP(rn(t,{b:1,c:'4f7cac',sz:n===1?26:n===2?24:22}),{st:'Heading'+n,bf:n===1?0:n===2?240:140,af:80});
-function blocos(txt,o){o=o||{};return String(txt).split(/\n+/).map(x=>x.trim()).filter(Boolean).map(l=>{
-  const m=/^[-•]\s+(.*)$/.exec(l);
-  return m?PP(rn('•',o)+'<w:r><w:tab/></w:r>'+rn(m[1],o),{ind:400,hang:260,jc:o.jc||'both',af:60}):PP(rn(l,o),{jc:o.jc||'both',af:o.af==null?100:o.af})}).join('')||PP('',{af:0})}
-const TC=(w,x,f,o)=>'<w:tc><w:tcPr><w:tcW w:w="'+w+'" w:type="dxa"/>'+(f?'<w:shd w:val="clear" w:color="auto" w:fill="'+f+'"/>':'')+'<w:tcMar><w:top w:w="70" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="70" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tcMar></w:tcPr>'+blocos(x,Object.assign({sz:20,jc:'left',af:40},o||{}))+'</w:tc>';
-function TB(ws,head,rows,labelCol){
-  const bd=['top','left','bottom','right','insideH','insideV'].map(s=>'<w:'+s+' w:val="single" w:sz="4" w:space="0" w:color="9DB7D5"/>').join('');
-  let x='<w:tbl><w:tblPr><w:tblW w:w="'+ws.reduce((a,b)=>a+b,0)+'" w:type="dxa"/><w:tblBorders>'+bd+'</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid>'+ws.map(w=>'<w:gridCol w:w="'+w+'"/>').join('')+'</w:tblGrid>';
-  if(head)x+='<w:tr><w:trPr><w:tblHeader/></w:trPr>'+head.map((t,i)=>TC(ws[i],t,'4f7cac',{b:1,c:'ffffff'})).join('')+'</w:tr>';
-  rows.forEach(r=>{x+='<w:tr><w:trPr><w:cantSplit/></w:trPr>'+r.map((t,i)=>TC(ws[i],t,labelCol&&i===0?'eaf0f7':'',labelCol&&i===0?{b:1}:{})).join('')+'</w:tr>'});
-  return x+'</w:tbl>'+PP('',{af:100})}
-function montarCorpo(D){
-  const per=periodoTxt(D.ini,D.fim),SEM='Sem registros no período.';let x='';
-  x+=HH(1,'RELATÓRIO PERIÓDICO DE ATIVIDADES DO ARTICULADOR MUNICIPAL');
-  x+=PP(rn('A ser anexado ao relatório no Notion',{i:1,c:'595959',sz:20}),{af:60});
-  x+=PP(rn(D.mun+' (PI)'+(per?' · '+per:''),{b:1,c:'595959',sz:21}),{af:160});
+function montarCorpo(D,X){
+  const ps=X.match(/<w:p[ >][\s\S]*?<\/w:p>/g)||[],tbs=X.match(/<w:tbl>[\s\S]*?<\/w:tbl>/g)||[];
+  const tx=p=>(p.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g)||[]).map(s=>s.replace(/<[^>]+>/g,'')).join('');
+  const achar=re=>ps.find(p=>re.test(tx(p)))||'';
+  const pPr=p=>(/<w:pPr>[\s\S]*?<\/w:pPr>/.exec(p)||[''])[0];
+  const rPr=p=>{const m=/<w:r[ >](?:(?!<\/w:r>)[\s\S])*?<w:t[\s\S]*?<\/w:r>/.exec(p);return m?((/<w:rPr>[\s\S]*?<\/w:rPr>/.exec(m[0])||[''])[0]):''};
+  const RB='<w:rPr><w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/><w:color w:val="000000"/><w:sz w:val="21"/><w:szCs w:val="21"/></w:rPr>';
+  const run=(r,t)=>'<w:r>'+r+'<w:t xml:space="preserve">'+esc(t)+'</w:t></w:r>';
+  const para=(tpl,t,r)=>'<w:p>'+pPr(tpl)+run(r==null?rPr(tpl):r,t)+'</w:p>';
+  const HT2=achar(/^Resumo da semana/),HT3=achar(/^\[Dia da semana\]/),HTA=achar(/^Anexo I/),pBody=achar(/^Em um ou dois/),pBul=achar(/^Registre cada atividade/);
+  const H2=t=>para(HT2,t),H3=t=>para(HT3,t),gap='<w:p><w:pPr><w:spacing w:before="0" w:after="60"/></w:pPr></w:p>';
+  const body=txt=>String(txt||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).map(l=>{const m=/^[-•]\s+(.*)$/.exec(l);return m?para(pBul,m[1],RB):para(pBody,l,RB)}).join('')||para(pBody,'Sem registros no período.',RB);
+  const rows=T=>T.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g)||[],cells=r=>r.match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[],head=T=>T.slice(0,T.search(/<w:tr[ >]/));
+  const cel=(tc,t)=>{const p=(/<w:p[ >][\s\S]*?<\/w:p>/.exec(tc)||[''])[0];let L=String(t||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);if(!L.length)L=[''];
+    return '<w:tc>'+(/<w:tcPr>[\s\S]*?<\/w:tcPr>/.exec(tc)||[''])[0]+L.map(l=>'<w:p>'+pPr(p)+run(rPr(p),l.replace(/^[-•]\s+/,'• '))+'</w:p>').join('')+'</w:tc>'};
+  const row=(rw,v)=>{const cs=cells(rw);return '<w:tr>'+((/<w:trPr>[\s\S]*?<\/w:trPr>/.exec(rw)||[''])[0])+v.map((t,i)=>cel(cs[i],t)).join('')+'</w:tr>'};
+  const tab=(T,hd,dados)=>{const r=rows(T);return head(T)+row(r[0],hd)+dados.map(d=>row(r[1],d)).join('')+'</w:tbl>'+gap};
+  const per=periodoTxt(D.ini,D.fim),SEM='Sem registros no período.';
+  let x=para(achar(/RELATÓRIO PERIÓDICO/),'RELATÓRIO PERIÓDICO DE ATIVIDADES DO ARTICULADOR MUNICIPAL')+para(achar(/A ser anexado/),'A ser anexado ao relatório no Notion')+para(achar(/\[Município\] \(PI\)/),D.mun+' (PI)  ·  '+per);
   const info=[['Período',per],['Município',D.mun+' — PI'],['Articulador(a) municipal',D.art],['Data de emissão',br(D.emissao)]];
   if(D.plan)info.push(['Planilha de Atualização do Plano de Ações (semanas do dia 1º e do dia 15)',D.plan+(D.plandata?' — atualizada no Drive do PPE em '+br(D.plandata):'')]);
-  x+=TB([3000,6643],null,info,1);
-  x+=HH(2,'Resumo da semana')+blocos(D.resumo||SEM);
-  x+=HH(2,'Atividades desenvolvidas');
+  const r0=rows(tbs[0]);x+=gap+head(tbs[0])+info.map(v=>row(r0[0],v)).join('')+'</w:tbl>'+gap;
+  if(D.plan)x+=tbs[1]+gap;
+  x+=H2('Resumo da semana')+body(D.resumo)+H2('Atividades desenvolvidas');
   const dias=D.dias.filter(r=>r.txt).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
-  if(!dias.length)x+=blocos(SEM);
-  dias.forEach(r=>{const d=pd(r.data);x+=HH(3,d?DIA[d.getDay()].replace(/^./,c=>c.toUpperCase())+', '+dd(d)+'/'+String(d.getMonth()+1).padStart(2,'0'):'[Dia]')+blocos(r.txt)});
+  if(!dias.length)x+=body(SEM);
+  dias.forEach(r=>{const d=pd(r.data);x+=H3(d?DIA[d.getDay()].replace(/^./,c=>c.toUpperCase())+', '+dd(d)+'/'+String(d.getMonth()+1).padStart(2,'0'):'[Dia]')+body(r.txt)});
   const dest=D.dest.filter(r=>r.plano||r.situacao||r.enc),sol=D.sol.filter(r=>r.plano||r.pedido||r.orgao||r.enc);
   if(dest.length||sol.length){
-    x+=HH(2,'Tema em destaque da semana');
-    if(dest.length)x+=HH(3,'Destaques da Semana')+TB([2300,4100,3243],['Plano de Ação','Situação relatada','Encaminhamentos'],dest.map(r=>[r.plano,r.situacao,r.enc]));
-    if(sol.length)x+=HH(3,'Solicitações e Encaminhamentos')+TB([1900,2900,1700,3143],['Plano de Ação','Solicitação','Órgão responsável','Encaminhamentos'],sol.map(r=>[r.plano,r.pedido,r.orgao,r.enc]));
+    x+=H2('Tema em destaque da semana');
+    if(dest.length)x+=H3('Destaques da Semana')+tab(tbs[2],['Plano de Ação','Situação relatada','Encaminhamentos'],dest.map(r=>[r.plano,r.situacao,r.enc]));
+    if(sol.length)x+=H3('Solicitações e Encaminhamentos')+tab(tbs[3],['Plano de Ação','Solicitação','Órgão responsável','Encaminhamentos'],sol.map(r=>[r.plano,r.pedido,r.orgao,r.enc]));
   }
-  x+=HH(2,'Pendências resolvidas e pontos de atenção')+HH(3,'Pendências resolvidas')+blocos(D.pendres||SEM)+HH(3,'Pontos de atenção')+blocos(D.atencao||SEM);
-  if(D.comunicados)x+=HH(2,'Comunicados, ofícios e convites recebidos')+blocos(D.comunicados);
-  x+=HH(2,'Agenda e programação da próxima semana');
+  x+=H2('Pendências resolvidas e pontos de atenção')+H3('Pendências resolvidas')+body(D.pendres||SEM)+H3('Pontos de atenção')+body(D.atencao||SEM);
+  if(D.comunicados)x+=H2('Comunicados, ofícios e convites recebidos')+body(D.comunicados);
+  x+=H2('Agenda e programação da próxima semana');
   const ag=D.ag.filter(r=>r.acao||r.local||r.data);
-  x+=ag.length?TB([2900,2000,4743],['Ação','Data / horário','Local e requisitos'],ag.map(r=>[r.acao,(br(r.data)+(r.hora?', '+r.hora.replace(':','h'):'')).trim(),r.local])):blocos(SEM);
-  x+=HH(2,'Anexo I — Registros da semana');
-  x+=PP(rn('Link da pasta de evidências no Drive do PPE: ',{b:1})+rn(D.link||'[colar link]'),{af:100});
-  if(D.anexo)x+=blocos(D.anexo);
+  x+=ag.length?tab(tbs[4],['Ação','Data / horário','Local e requisitos'],ag.map(r=>[r.acao,(br(r.data)+(r.hora?', '+r.hora.replace(':','h'):'')).trim(),r.local])):body(SEM);
+  x+=para(HTA,'Anexo I — Registros da semana')+para(pBody,'Link da pasta de evidências no Drive do PPE: '+(D.link||'[colar link]'),RB)+(D.anexo?body(D.anexo):'');
   return x;
 }
 /* docx:fim */
@@ -923,19 +942,143 @@ $('btnDocx').onclick=async()=>{
     const zip=await JSZip.loadAsync(await r.arrayBuffer());
     let xml=await zip.file('word/document.xml').async('string');
     const a=xml.indexOf('<w:body>')+8,b=xml.lastIndexOf('<w:sectPr');
-    zip.file('word/document.xml',xml.slice(0,a)+montarCorpo(D)+xml.slice(b));
+    zip.file('word/document.xml',xml.slice(0,a)+montarCorpo(D,xml)+xml.slice(b));
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
     const nome=(D.emissao||'').replace(/-/g,'')+'_PPE_Relatorio_Semanal_'+D.art.normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().replace(/\s+/g,'_')+'.docx';
     const u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download=nome;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);
-    toast('Documento gerado: '+nome);
+    renderNotion();$('notion').scrollIntoView({behavior:'smooth'});toast('Documento gerado: '+nome+'. O formulário do Notion está logo abaixo.');
   }catch(e){e.tent=tent;falha(e,'Gerar relatório .docx')}
 };
+
+/* ---------- geração automática (resumo e atividades do Notion) ---------- */
+function montarBase(){
+  const o=(id,i,k)=>String((S.grp.out[id][i]||{})[k]||(S.grp.in[id][i]||{})[k]||'').trim(),f=k=>String(S.outputs.semanal[k]||S.inputs.semanal[k]||'').trim();let b='';
+  S.grp.in.dia.forEach((r,i)=>{const t=o('dia',i,'txt');if(!t)return;const d=pd((r||{}).data);b+='\n'+(d?DIA[d.getDay()]+', '+dd(d)+'/'+String(d.getMonth()+1).padStart(2,'0'):'Dia não informado')+':\n'+t+'\n'});
+  S.grp.in.dest.forEach((r,i)=>{const t=['plano','situacao','enc'].map(k=>o('dest',i,k)).filter(Boolean).join(' | ');if(t)b+='\nDestaque: '+t});
+  S.grp.in.sol.forEach((r,i)=>{const t=['plano','pedido','orgao','enc'].map(k=>o('sol',i,k)).filter(Boolean).join(' | ');if(t)b+='\nSolicitação: '+t});
+  [['pendres','Pendências resolvidas'],['atencao','Pontos de atenção'],['comunicados','Comunicados']].forEach(([k,n])=>{if(f(k))b+='\n'+n+': '+f(k)});
+  return b.trim();
+}
+async function derivar(k,quieto){
+  const base=montarBase();if(!base){if(!quieto)toast('Preencha as atividades por dia primeiro.');return}
+  if(ocupado)return;ocupado=true;marcar([k],true);
+  try{
+    const d=await chamarReescrita({[k]:base},{campo:k,base,evitar:k==='atividades'?(S.outputs.semanal.resumo||''):''});
+    if(d.acesso)throw new Error('Código de acesso do servidor recusado (HTTP 401)');
+    S.outputs.semanal[k]=(d.campos&&d.campos[k])||'';save();renderCampos();toast('Gerado a partir das atividades.'+(d.motor?' ['+d.motor+']':''));
+  }catch(e){falha(e,'Gerar "'+k+'" a partir das atividades')}finally{ocupado=false;marcar([k],false)}
+}
+
+/* ---------- painel do formulário do Notion ---------- */
+function renderNotion(){
+  const box=$('notion');if(!box)return;if(S.tipo!=='semanal'){box.innerHTML='';return}
+  const v=k=>String(S.outputs.semanal[k]||S.inputs.semanal[k]||'').trim();
+  const bl=(ic,n,d,k,ob)=>'<div class="nt">'+ic+' '+n+(ob?'<span>*</span>':'')+'</div><div class="nd">'+d+'</div><div class="nbox">'+(esc(v(k))||'<i>Sua resposta</i>')+'</div><button class="btn sm" data-nc="'+k+'" type="button">Copiar</button>';
+  box.innerHTML='<h2 class="sep">Formulário do Notion (copiar e colar)</h2><div class="nform"><div class="nt" style="margin-top:6px">Tipo<span>*</span></div><div class="nradio"><div>○ 📍 Registro territorial</div><div class="on">◉ 📝 Relatório semanal</div><div>○ 📎 Outro registro</div></div>'
+   +bl('✅','Principais atividades da semana','Liste as principais atividades realizadas durante a semana.','atividades',1)
+   +bl('📎','Arquivo do relatório','Anexe aqui o link do arquivo do relatório em formato .docx (word).','linkrel',1)
+   +bl('🗂️','Evidências | Materiais','Anexe aqui o link de arquivos ou mídias relevantes para este relatório. Lembre-se de hospedar na pasta do Drive do seu município.','evidencias',0)+'</div>';
+}
+$('notion').addEventListener('click',e=>{const b=e.target.closest('[data-nc]');if(!b)return;const t=String(S.outputs.semanal[b.dataset.nc]||S.inputs.semanal[b.dataset.nc]||'').trim();t?copiar(t):toast('Nada para copiar ainda.')});
+
+/* ---------- registros salvos ---------- */
+const RK='ppe-registros-v1';let R=[];try{R=JSON.parse(localStorage.getItem(RK)||'[]')}catch(e){}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const PER0={ini:'',fim:'',emissao:hoje(),art:'Peter Moura Rodrigues',plan:'',plandata:''};
+function temConteudo(){return Object.values(S.inputs).some(o=>Object.values(o).some(v=>String(v).trim()))||Object.values(S.grp.in).some(a=>a.some(r=>Object.values(r||{}).some(v=>String(v).trim())))}
+function upsert(){
+  if(!temConteudo())return;
+  const p=S.tipo==='semanal'&&S.per.ini&&S.per.fim?periodoTxt(S.per.ini,S.per.fim):br(S.data);
+  const reg={id:S.rid,tipo:S.tipo,titulo:TIPOS[S.tipo].rotulo+' · '+S.municipio+' · '+p,atualizado:Date.now(),snap:JSON.parse(JSON.stringify({tipo:S.tipo,data:S.data,municipio:S.municipio,inputs:S.inputs,outputs:S.outputs,grp:S.grp,per:S.per}))};
+  const i=R.findIndex(x=>x.id===S.rid);if(i>=0)R[i]=reg;else R.unshift(reg);
+  try{localStorage.setItem(RK,JSON.stringify(R))}catch(e){}
+  const n=$('nReg');if(n)n.textContent=R.length;
+}
+function setAba(a){
+  $('vEd').style.display=a==='ed'?'':'none';$('vReg').style.display=a==='reg'?'':'none';$('bar').style.display=a==='ed'?'':'none';
+  document.querySelectorAll('[data-aba]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.aba===a)));if(a==='reg')renderReg();
+}
+function novoRegistro(){
+  upsert();S.rid=uid();S.inputs={semanal:{},territorial:{},outro:{}};S.outputs={semanal:{},territorial:{},outro:{}};S.grp={in:vz(),out:vz()};
+  S.data=hoje();S.per=Object.assign({},PER0,{art:S.per.art});save();renderTudo();setAba('ed');
+}
+function renderReg(){
+  const v=$('vReg'),L=R.slice().sort((a,b)=>b.atualizado-a.atualizado);
+  v.innerHTML=L.length?'':'<p class="sub">Nenhum registro salvo ainda. Eles são salvos automaticamente enquanto você escreve.</p>';
+  L.forEach(r=>{const el=document.createElement('div');el.className='card regi';el.dataset.id=r.id;
+    el.innerHTML='<div class="kinfo"><b></b><small></small></div><div class="kbtn"><button class="btn" data-ra="open" type="button">Abrir</button><button class="btn" data-ra="del" type="button">Excluir</button></div>';
+    el.querySelector('b').textContent=r.titulo+(r.id===S.rid?'  (em edição)':'');
+    el.querySelector('small').textContent='Atualizado em '+new Date(r.atualizado).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+    v.appendChild(el)});
+}
+$('vReg').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ra]');if(!b)return;const id=b.closest('.regi').dataset.id,r=R.find(x=>x.id===id);if(!r)return;
+  if(b.dataset.ra==='open'){upsert();Object.assign(S,JSON.parse(JSON.stringify(r.snap)),{rid:id});S.per=Object.assign({},PER0,S.per);S.grp.in=Object.assign(vz(),S.grp.in);S.grp.out=Object.assign(vz(),S.grp.out);localStorage.setItem(KEY,JSON.stringify(S));renderTudo();setAba('ed')}
+  else if(confirm('Excluir este registro salvo?')){R=R.filter(x=>x.id!==id);try{localStorage.setItem(RK,JSON.stringify(R))}catch(e){}$('nReg').textContent=R.length;if(id===S.rid)novoRegistro();setAba('reg')}
+});
+document.querySelectorAll('[data-aba]').forEach(b=>b.onclick=()=>setAba(b.dataset.aba));
+$('btnNovo').onclick=()=>{novoRegistro();toast('Novo registro criado.')};
+
+/* ---------- importar Word (.docx) como rascunho ---------- */
+function importarArq(f){return /\.docx$/i.test(f.name)?f.arrayBuffer().then(importarDocx):f.arrayBuffer().then(importar)}
+const deXml=s=>s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+const txtP=p=>deXml((p.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>|<w:tab\/>|<w:br\/>/g)||[]).map(s=>/^<w:t/.test(s)&&!/^<w:tab/.test(s)?s.replace(/<[^>]+>/g,''):' ').join(''));
+function lerDocx(xml){
+  const it=[];
+  (xml.match(/<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g)||[]).forEach(b=>{
+    if(b.startsWith('<w:tbl>'))it.push({tbl:(b.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g)||[]).map(r=>(r.match(/<w:tc>[\s\S]*?<\/w:tc>/g)||[]).map(c=>(c.match(/<w:p[ >][\s\S]*?<\/w:p>/g)||[]).map(txtP).filter(x=>x.trim()).join('\n').trim()))});
+    else{const st=(/<w:pStyle w:val="([^"]+)"/.exec(b)||[])[1]||'';it.push({t:txtP(b).trim(),h:/^Heading/.test(st),b:!/^Heading/.test(st)&&/<w:numPr>/.test(b)})}
+  });
+  return it;
+}
+function importarDocx(buf){
+  return JSZip.loadAsync(buf).then(z=>z.file('word/document.xml').async('string')).then(xml=>{
+    const items=lerDocx(xml),T=s=>norm(s).replace(/^\d+\.\s*/,'');
+    const SEC=[['RESUMO DA SEMANA','resumo'],['ATIVIDADES DESENVOLVIDAS','dias'],['TEMA EM DESTAQUE','tema'],['DESTAQUES DA SEMANA','dest'],['SOLICITACOES E ENCAMINHAMENTOS','sol'],['PENDENCIAS RESOLVIDAS E PONTOS','pend'],['PENDENCIAS RESOLVIDAS','pendres'],['PONTOS DE ATENCAO','atencao'],['COMUNICADOS','comunicados'],['AGENDA','ag'],['ANEXO I','anexo']];
+    const INSTR=/^(Em um ou dois|Registre |Inclua apenas|Quando o assunto|Plano de Ação:|Informe,|Liste as ações|Nesses relatórios|Atenção:|A ser anexado|Sem registros no período)/,DAYRE=/^(?:domingo|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado)[^,\d]*,?\s*(\d{1,2})\/(\d{1,2})/i;
+    const R2={resumo:[],pendres:[],atencao:[],comunicados:[],anexo:[]},dias=[],dest=[],sol=[],ag=[],info={},todos=[];let sec='',link='',visto=false;
+    for(const x of items){
+      if(x.tbl){const rs=x.tbl.filter(r=>r.some(c=>c));
+        if(!visto&&!Object.keys(info).length){rs.forEach(r=>{info[norm(r[0])]=r[1]||''});continue}
+        const d=rs.filter(r=>!/^\[/.test(r[0]||'')&&!/^(PLANO DE ACAO|ACAO)$/.test(norm(r[0]||'')));
+        if(sec==='dest')d.forEach(r=>dest.push({plano:r[0]||'',situacao:r[1]||'',enc:r[2]||''}));
+        else if(sec==='sol')d.forEach(r=>sol.push({plano:r[0]||'',pedido:r[1]||'',orgao:r[2]||'',enc:r[3]||''}));
+        else if(sec==='ag')d.forEach(r=>ag.push({acao:r[0]||'',dh:r[1]||'',local:r[2]||''}));
+        continue}
+      const t=x.t;if(!t)continue;
+      const k=SEC.find(([n])=>T(t).startsWith(n));
+      if(k&&(x.h||t.length<90)){sec=k[1];visto=true;continue}
+      if(INSTR.test(t)||/^\[.*\]$/.test(t))continue;
+      if(!visto){todos.push(t);continue}
+      const ln=x.b?'- '+t:t;
+      if(sec==='dias'){const m=!x.b&&DAYRE.exec(t);if(m){dias.push({data:'',dm:[m[1],m[2]],txt:''});continue}
+        if(!dias.length)dias.push({data:'',txt:''});const u=dias[dias.length-1];u.txt+=(u.txt?'\n':'')+ln}
+      else if(sec==='anexo'){const l=/Link da pasta[^:]*:\s*(.*)$/i.exec(t);if(l){link=/^\[.*\]$/.test(l[1])?'':l[1].trim();continue}R2.anexo.push(ln)}
+      else if(R2[sec])R2[sec].push(ln);
+    }
+    const g=p=>{const k=Object.keys(info).find(y=>y.startsWith(p));return k?info[k]:''};
+    const pm=/(\d{1,2})(?: de ([a-zç]+))? a (\d{1,2}) de ([a-zç]+)(?: de (\d{4}))?/i.exec(g('PERIODO')),mi=n=>String(MES.indexOf(String(n).toLowerCase())+1).padStart(2,'0');
+    const ano=(pm&&pm[5])||(/(\d{4})/.exec(g('DATA DE EMISSAO'))||[])[1]||String(new Date().getFullYear());
+    const per={};if(pm&&MES.indexOf(pm[4].toLowerCase())>=0){per.fim=ano+'-'+mi(pm[4])+'-'+pm[3].padStart(2,'0');per.ini=ano+'-'+(pm[2]?mi(pm[2]):mi(pm[4]))+'-'+pm[1].padStart(2,'0')}
+    const em=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(g('DATA DE EMISSAO'));if(em)per.emissao=em[3]+'-'+em[2].padStart(2,'0')+'-'+em[1].padStart(2,'0');
+    const art=g('ARTICULADOR');if(art&&!/^\[/.test(art))per.art=art;
+    const pl=g('PLANILHA');if(/^(sim|n[ãa]o)/i.test(pl)){per.plan=/^sim/i.test(pl)?'Sim':'Não';const d=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(pl);if(d)per.plandata=d[3]+'-'+d[2].padStart(2,'0')+'-'+d[1].padStart(2,'0')}
+    dias.forEach(d=>{if(d.dm)d.data=ano+'-'+d.dm[1].padStart(2,'0')+'-'+d.dm[0].padStart(2,'0');delete d.dm});
+    if(!visto&&todos.length)dias.push({data:'',txt:todos.join('\n')});
+    const agr=ag.map(r=>{const d=/(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(r.dh||''),h=/(\d{1,2})\s*h\s*(\d{2})?/i.exec(r.dh||'');return{acao:r.acao,local:r.local,data:d?d[3]+'-'+d[2].padStart(2,'0')+'-'+d[1].padStart(2,'0'):'',hora:h?h[1].padStart(2,'0')+':'+(h[2]||'00'):''}});
+    if(temConteudo())novoRegistro();
+    S.tipo='semanal';S.inputs.semanal={resumo:R2.resumo.join('\n'),pendres:R2.pendres.join('\n'),atencao:R2.atencao.join('\n'),comunicados:R2.comunicados.join('\n'),anexo:R2.anexo.join('\n'),evidencias:link};S.outputs.semanal={};
+    S.grp={in:{dia:dias,dest,sol,ag:agr},out:vz()};Object.assign(S.per,per);
+    const m=MUNICIPIOS.find(y=>norm(y)===norm(g('MUNICIPIO').replace(/\s*[—–-]\s*PI$/i,'')));if(m)S.municipio=m;
+    save();renderTudo();setAba('ed');toast('Rascunho importado do Word'+(visto?'':' (estrutura não reconhecida: texto colocado em um dia)')+'. Clique em “Reescrever tudo”.');
+  }).catch(e=>falha(e,'Importar arquivo Word (.docx)'));
+}
 
 /* ---------- início ---------- */
 const sel=$('municipio');
 MUNICIPIOS.forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o)});
 if(!MUNICIPIOS.includes(S.municipio))S.municipio='São José do Piauí';
-renderTudo();
+renderTudo();$('nReg').textContent=R.length;
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 })();
 </script>
