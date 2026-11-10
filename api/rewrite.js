@@ -102,6 +102,17 @@ const GRUPOS = {
     { k: 'hora', nome: 'Horário', tipo: 'time' },
     { k: 'local', nome: 'Local e requisitos', ia: 1, formato: 'prosa', guia: 'Local da ação e, se anotados, público, documentos exigidos e demais requisitos para participar.' }] },
 };
+// Geração automática do Resumo e das Principais atividades (Notion) a partir das atividades do dia.
+function prefacioDerivar(dv) {
+  const instr = dv.campo === 'resumo'
+    ? 'Redija o RESUMO DA SEMANA em um ou dois parágrafos curtos (prosa, sem tópicos), apresentando os principais fatos da semana: o que foi concluído, o que avançou e quais temas merecem atenção da gestão municipal e da coordenação do PPE. O resumo deve permitir entender a semana sem ler o restante do relatório.'
+    : 'Redija o campo PRINCIPAIS ATIVIDADES DA SEMANA (formulário do Notion) em tópicos, um por linha, iniciados por "- " e com "Foi/Foram" (voz passiva), selecionando e consolidando as principais atividades (em geral de 4 a 8 itens). Não é um resumo corrido: são tópicos objetivos.';
+  return {
+    antes: 'ATENÇÃO: neste pedido o texto do campo NÃO é um rascunho a corrigir. É o conjunto das atividades e registros da semana, já em tom formal. ' + instr + ' Use somente fatos presentes no conjunto, sem acrescentar nada.\\n\\n',
+    depois: dv.evitar ? '\\nTexto já usado em outro campo do mesmo relatório (NÃO repita as mesmas frases nem a mesma estrutura; traga outro recorte e outra redação):\\n"""\\n' + dv.evitar + '\\n"""\\n' : '',
+  };
+}
+
 function guiaDe(tipo, k) {
   if (CAMPOS[tipo] && CAMPOS[tipo][k]) return CAMPOS[tipo][k];
   const m = /^(dia|dest|sol|ag)_\d{1,2}_([a-z]+)$/.exec(k);
@@ -369,6 +380,9 @@ module.exports = async (req, res) => {
     const v = limpar(corpo.campos && corpo.campos[k]);
     if (v) campos[k] = v.slice(0, 12000);
   }
+  const dv = (tipo === 'semanal' && corpo.derivar && (corpo.derivar.campo === 'resumo' || corpo.derivar.campo === 'atividades'))
+    ? { campo: corpo.derivar.campo, evitar: limpar(corpo.derivar.evitar).slice(0, 6000) } : null;
+  if (dv) { for (const k of Object.keys(campos)) delete campos[k]; campos[dv.campo] = limpar(corpo.derivar.base).slice(0, 20000); }
   const chaves = Object.keys(campos);
   if (!chaves.length) return res.status(200).json({ campos: {}, avisos: [] });
 
@@ -381,6 +395,8 @@ module.exports = async (req, res) => {
     const g = guiaDe(tipo, k);
     mensagem += `\n=== Campo "${k}" — ${g.nome} ===\nOrientação do campo: ${g.guia}\nFormato: ${g.formato}\nAnotações do articulador:\n"""\n${campos[k]}\n"""\n`;
   }
+
+  if (dv) { const p = prefacioDerivar(dv); mensagem = p.antes + mensagem + p.depois; }
 
   const sistema = montarSistema();
 
